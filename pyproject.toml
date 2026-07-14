@@ -1,0 +1,70 @@
+[project]
+name = "wireme"
+version = "0.1.0"
+description = "Tiny, typed dependency injection built on FastDepends."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Mohanad Ghali", email = "mghalix@gmail.com" }]
+keywords = ["dependency-injection", "di", "fast-depends", "typing"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+dependencies = ["fast-depends[pydantic]>=3.0.8,<4"]
+
+[project.urls]
+Homepage = "https://github.com/mghalix/wireme"
+Repository = "https://github.com/mghalix/wireme"
+Issues = "https://github.com/mghalix/wireme/issues"
+Changelog = "https://github.com/mghalix/wireme/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+dev = ["basedpyright", "pytest", "pytest-cov", "ruff", "trio"]
+
+[build-system]
+requires = ["uv_build>=0.10.0,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["B", "E4", "E7", "E9", "F", "I", "N", "RUF", "S", "SIM", "UP"]
+ignore = ["N802", "S101"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["wireme.Wired", "wireme.wired"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["wireme"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+
+[tool.basedpyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+reportAny = false
+reportExplicitAny = false
+reportPrivateUsage = false
