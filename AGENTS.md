@@ -47,7 +47,6 @@ explicitly selected isolated environment.
 - just build  ->  uv build --no-sources into a clean dist/
 - just docs  ->  serve the docs site locally with live reload
 - just docs-build  ->  build the docs site into website/site
-- just brand  ->  install brand assets from ~/Downloads via scripts/brand
 - just smoke  ->  wheel and sdist smoke tests (core, missing extra, fastapi)
 - just release-check  ->  check + smoke
 - just clean  ->  remove caches and build artifacts
