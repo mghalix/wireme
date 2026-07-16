@@ -82,17 +82,28 @@ jobs:
           --python ${{ matrix.python-version }}
 
       - name: Check formatting
-        run: uv run ruff format --check .
+        run: >
+          uv run
+          --python ${{ matrix.python-version }}
+          ruff format --check .
 
       - name: Lint
-        run: uv run ruff check .
+        run: >
+          uv run
+          --python ${{ matrix.python-version }}
+          ruff check .
 
       - name: Type check
-        run: uv run basedpyright
+        run: >
+          uv run
+          --python ${{ matrix.python-version }}
+          basedpyright
 
       - name: Run all tests with coverage
         run: >
-          uv run pytest
+          uv run
+          --python ${{ matrix.python-version }}
+          pytest
           tests/unit
           tests/integration
           --cov=wireme
@@ -102,7 +113,7 @@ jobs:
         run: |
           for example in examples/*.py; do
             echo "== ${example}"
-            uv run python "${example}"
+            uv run --python ${{ matrix.python-version }} python "${example}"
           done
 
   smoke:
