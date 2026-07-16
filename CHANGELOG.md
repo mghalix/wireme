@@ -5,6 +5,13 @@ minor, features and fixes bump patch (docs/adr/0012).
 
 ## 0.1.1 - 2026-07-16
 
+- Replace the repository and documentation identity with approved path-only
+  SVG masters, deterministic typography, responsive dark and light banners,
+  and a compact favicon derived from the same visual language.
+- Centralize brand installation in the shared `repo-brand` command and remove
+  the duplicated project-local installer and maintainer-only task recipe.
+- Reuse one provider-neutral `social-preview.png` for GitHub, Open Graph, and
+  Twitter metadata, with absolute website image URLs and an enforced safe area.
 - Add the optional FastAPI integration `wireme.fastapi` with `FromWeb` and
   `override_web_dependency`, installed with `uv add 'wireme[fastapi]'`.
 - `FromWeb[WiredClass]` lets FastAPI construct classes whose wired

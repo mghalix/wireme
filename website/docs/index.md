@@ -1,5 +1,6 @@
 ---
 title: Wireme
+social_preview: true
 hide:
   - toc
 ---

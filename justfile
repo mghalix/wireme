@@ -44,10 +44,6 @@ smoke: build
     ./scripts/smoke "$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
     ./scripts/smoke "$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)"
 
-# Install brand assets (wireme-*.png/jpg) from ~/Downloads or a given dir.
-brand source='':
-    ./scripts/brand {{ source }}
-
 # Serve the docs site locally with live reload (opens the browser).
 docs:
     cd website && uvx zensical serve -o
