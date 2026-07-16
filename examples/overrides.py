@@ -22,7 +22,7 @@ type DatabaseDep = Annotated[Database, wired(get_database)]
 
 
 @wire
-def database_name(database: DatabaseDep = Wired()) -> str:
+def database_name(*, database: DatabaseDep = Wired()) -> str:
     return database.name
 
 

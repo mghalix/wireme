@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 
 from wireme import wire, wired
 
@@ -30,13 +30,28 @@ async def get_client() -> AsyncIterator[Client]:
 @wire
 async def fetch(
     path: str,
+    *,
     client: Client = wired(get_client),
 ) -> str:
     return await client.fetch(path)
 
 
+def get_workspace() -> Iterator[str]:
+    print("workspace created")
+    try:
+        yield "./build"
+    finally:
+        print("workspace removed")
+
+
+@wire
+def build(*, workspace: str = wired(get_workspace)) -> str:
+    return f"built in {workspace}"
+
+
 async def main() -> None:
     print(await fetch("/users/mo"))
+    print(build())
 
 
 if __name__ == "__main__":
