@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Smoke test one built artifact (wheel or sdist) in fresh isolated
+# environments, from a temporary working directory, without inheriting the
+# repository's virtual environment. --refresh forces uv to revalidate its
+# cache so a rebuilt artifact with an unchanged version is never stale.
+
+set -euo pipefail
+
+repository="$(cd "$(dirname "$0")/.." && pwd)"
+artifact="$(realpath "$1")"
+temporary="$(mktemp -d)"
+
+trap 'rm -rf "${temporary}"' EXIT
+
+echo "==> ${artifact##*/}: core install without extras"
+
+core_python="${temporary}/core/.venv/bin/python"
+
+uv venv --quiet "${temporary}/core/.venv"
+uv pip install \
+    --quiet \
+    --python "${core_python}" \
+    --refresh \
+    --link-mode copy \
+    "${artifact}"
+
+(cd "${temporary}/core" && "${core_python}" "${repository}/tests/smoke/core.py")
+(cd "${temporary}/core" && "${core_python}" "${repository}/tests/smoke/fastapi_missing.py")
+
+echo "==> ${artifact##*/}: install with the fastapi extra"
+
+fastapi_python="${temporary}/fastapi/.venv/bin/python"
+
+uv venv --quiet "${temporary}/fastapi/.venv"
+uv pip install \
+    --quiet \
+    --python "${fastapi_python}" \
+    --refresh \
+    --link-mode copy \
+    "wireme[fastapi] @ file://${artifact}" \
+    httpx2
+
+(cd "${temporary}/fastapi" && "${fastapi_python}" "${repository}/tests/smoke/fastapi_integration.py")
