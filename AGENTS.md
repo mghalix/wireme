@@ -45,7 +45,10 @@ explicitly selected isolated environment.
 - uv run ruff format .  ->  format
 - just check  ->  format check, lint, types, tests with coverage
 - just build  ->  uv build --no-sources into a clean dist/
-- just smoke  ->  artifact smoke tests (core, missing extra, fastapi)
+- just docs  ->  serve the docs site locally with live reload
+- just docs-build  ->  build the docs site into website/site
+- just brand  ->  install brand assets from ~/Downloads via scripts/brand
+- just smoke  ->  wheel and sdist smoke tests (core, missing extra, fastapi)
 - just release-check  ->  check + smoke
 - just clean  ->  remove caches and build artifacts
 
@@ -56,6 +59,18 @@ pyproject.toml; integration test modules declare:
     pytestmark = pytest.mark.integration
 
 # Architecture
+
+Architecture decisions are recorded in docs/adr (MADR-lite, append-only).
+Public API changes require a new ADR; open questions live in
+docs/adr/deferred-decisions.md.
+
+User documentation: README.md is a thin landing page; depth lives in
+website/docs (guide pages, recipes, the-wireme-way), served as a Zensical
+site at https://wireme.mghalix.com and browsable on GitHub. Every public
+capability must appear in at least one runnable example, indexed in
+examples/README.md. When a capability is added, update the guide page, the
+example, and the index together. Build the site with "just docs-build";
+serve locally with "just docs".
 
 Core package:
 
@@ -101,8 +116,9 @@ Plain class or callable:
 
     service: FromWeb[UserService]
 
-FastAPI owns the web-facing dependency. A class may use @wire on its
-constructor so Wireme resolves its internal dependencies.
+FastAPI owns the web-facing dependency. A class may use @wire (on the class,
+which wires the constructor it defines, or on __init__ directly) so Wireme
+resolves its internal dependencies.
 
 Reusable Wireme alias:
 
@@ -205,7 +221,21 @@ Smoke tests must:
 Using "uv run --with" is not sufficient when it can reuse or layer over the
 active project environment. Prefer creating a temporary environment with
 "uv venv" and installing the exact artifact with "uv pip install --python".
-The just recipes smoke-fastapi-missing and smoke-fastapi show the pattern.
+Pass --refresh to uv pip install so a rebuilt artifact with an unchanged
+version is never served stale from the uv cache. The scripts/smoke script
+shows the pattern; just smoke runs it for the wheel and the sdist.
+
+# Versioning
+
+Wireme follows SemVer (docs/adr/0012). Below 1.0.0 the strict 0.x mapping
+applies:
+
+- Breaking API change -> minor bump (0.2.1 -> 0.3.0)
+- New backward-compatible feature -> patch bump (0.2.1 -> 0.2.2)
+- Bug fix -> patch bump (0.2.1 -> 0.2.2)
+
+In 0.x the minor number is the breaking-change signal. Choose the next
+version from the changelog content, not from feature size.
 
 # Release process
 
@@ -267,3 +297,7 @@ Use ASCII only.
   constrain compatible dependency versions.
 - Ruff: line length 88, target py312. Wired and wired are registered in
   flake8-bugbear extend-immutable-calls so B008 allows them in defaults.
+- In docs and examples, declare injected parameters keyword-only, grouped
+  after * at the end of the signature (docs/adr/0009).
+- Docs and examples show the author-preferred form first; alternatives come
+  after, framed as such (docs/adr/0011).

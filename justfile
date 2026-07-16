@@ -1,37 +1,60 @@
-set shell := ["bash", "-cu"]
+set shell := ["bash", "-euo", "pipefail", "-c"]
 
 default:
     @just --list
 
-sync:
-    uv sync --all-groups
+# Remove python tool caches and build artifacts.
+clean:
+    ./scripts/clean
 
-format:
-    uv run ruff format .
-    uv run ruff check --fix .
+test-unit:
+    uv run pytest tests/unit
+
+test-integration:
+    uv run pytest tests/integration -m integration
+
+test:
+    uv run pytest \
+        tests/unit \
+        tests/integration \
+        --cov=wireme \
+        --cov-report=term-missing
 
 check:
     uv run ruff format --check .
     uv run ruff check .
     uv run basedpyright
-    uv run pytest --cov=wireme --cov-report=term-missing
+    uv run pytest \
+        tests/unit \
+        tests/integration \
+        --cov=wireme \
+        --cov-report=term-missing
 
 build:
     rm -rf dist
     uv build --no-sources
 
+smoke-wheel: build
+    ./scripts/smoke "$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
+
+smoke-sdist: build
+    ./scripts/smoke "$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)"
+
 smoke: build
-    #!/usr/bin/env bash
-    set -euo pipefail
+    ./scripts/smoke "$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
+    ./scripts/smoke "$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)"
 
-    wheel="$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
-    sdist="$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)"
+# Install brand assets (wireme-*.png/jpg) from ~/Downloads or a given dir.
+brand source='':
+    ./scripts/brand {{ source }}
 
-    uv run --isolated --no-project --with "$wheel" \
-        python tests/smoke_test.py
+# Serve the docs site locally with live reload (opens the browser).
+docs:
+    cd website && uvx zensical serve -o
 
-    uv run --isolated --no-project --with "$sdist" \
-        python tests/smoke_test.py
+# Build the docs site into website/site.
+docs-build:
+    cd website && uvx zensical build --strict
 
 release-check: check smoke
 
