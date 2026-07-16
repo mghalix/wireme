@@ -43,6 +43,33 @@ def annotated(value: Value = Wired()) -> str:
 assert_type(direct(), str)
 assert_type(annotated(), str)
 
+
+def guard() -> None:
+    return None
+
+
+@wire(cast=False, cast_result=False)
+def uncast(value: str = wired(sync_dependency)) -> str:
+    return value
+
+
+@wire(requires=(guard,))
+def guarded(value: str = wired(sync_dependency)) -> str:
+    return value
+
+
+assert_type(uncast(), str)
+assert_type(guarded(), str)
+
+
+@wire
+class WiredService:
+    def __init__(self, *, value: str = wired(sync_dependency)) -> None:
+        self.value = value
+
+
+assert_type(WiredService(), WiredService)
+
 with override_dependency(async_dependency, sync_dependency):
     pass
 
