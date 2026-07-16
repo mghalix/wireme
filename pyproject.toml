@@ -27,8 +27,18 @@ Repository = "https://github.com/mghalix/wireme"
 Issues = "https://github.com/mghalix/wireme/issues"
 Changelog = "https://github.com/mghalix/wireme/blob/main/CHANGELOG.md"
 
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.128,<1"]
+
 [dependency-groups]
-dev = ["basedpyright", "pytest", "pytest-cov", "ruff", "trio"]
+dev = [
+    "basedpyright",
+    "httpx2>=2.7.0",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "trio",
+]
 
 [build-system]
 requires = ["uv_build>=0.10.0,<0.11.0"]
@@ -43,14 +53,15 @@ select = ["B", "E4", "E7", "E9", "F", "I", "N", "RUF", "S", "SIM", "UP"]
 ignore = ["N802", "S101"]
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["wireme.Wired", "wireme.wired"]
+extend-immutable-calls = ["pydantic.Field", "wireme.Wired", "wireme.wired"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-config --strict-markers"
-testpaths = ["tests"]
+testpaths = ["tests/unit", "tests/integration"]
+addopts = ["--strict-config", "--strict-markers"]
+markers = ["integration: tests involving optional third-party frameworks"]
 
 [tool.coverage.run]
 branch = true
@@ -62,7 +73,7 @@ show_missing = true
 skip_covered = true
 
 [tool.basedpyright]
-include = ["src", "tests"]
+include = ["src", "tests/unit", "tests/integration", "tests/typing", "examples"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 reportAny = false

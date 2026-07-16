@@ -17,11 +17,11 @@ def get_database() -> Database:
 type DatabaseDep = Annotated[Database, wired(get_database)]
 
 
+@wire
 class StatefulTextProcessor:
     """Use constructor injection when the dependency is part of object state."""
 
-    @wire
-    def __init__(self, database: DatabaseDep = Wired()) -> None:
+    def __init__(self, *, database: DatabaseDep = Wired()) -> None:
         self._database = database
 
     def process(self, text: str) -> None:
@@ -36,6 +36,7 @@ class StatelessTextProcessor:
     def process(
         self,
         text: str,
+        *,
         database: DatabaseDep = Wired(),
     ) -> None:
         print("Processing with method injection...")

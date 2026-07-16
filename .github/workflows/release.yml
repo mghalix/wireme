@@ -60,20 +60,10 @@ jobs:
         run: uvx twine check dist/*
 
       - name: Smoke test wheel
-        run: >
-          uv run
-          --isolated
-          --no-project
-          --with dist/*.whl
-          python tests/smoke_test.py
+        run: ./scripts/smoke "$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
 
       - name: Smoke test source distribution
-        run: >
-          uv run
-          --isolated
-          --no-project
-          --with dist/*.tar.gz
-          python tests/smoke_test.py
+        run: ./scripts/smoke "$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)"
 
       - name: Publish
-        run: uv publish
+        run: uv publish --trusted-publishing always

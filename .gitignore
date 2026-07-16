@@ -10,6 +10,7 @@ htmlcov/
 # Build
 build/
 dist/
+website/site/
 
 # Environments
 .venv/

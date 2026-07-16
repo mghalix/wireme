@@ -17,6 +17,7 @@ def get_database() -> Database:
 @wire
 def process_text(
     text: str,
+    *,
     database: Database = wired(get_database),
 ) -> None:
     print("Processing with a direct dependency...")
@@ -29,6 +30,7 @@ type DatabaseDep = Annotated[Database, wired(get_database)]
 @wire
 def process_text_reusable(
     text: str,
+    *,
     database: DatabaseDep = Wired(),
 ) -> None:
     print("Processing with a reusable dependency...")
