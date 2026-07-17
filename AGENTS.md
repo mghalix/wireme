@@ -63,7 +63,7 @@ explicitly selected isolated environment.
 - just docs  ->  serve the docs site locally with live reload
 - just docs-build  ->  build the docs site into website/site
 - just smoke  ->  wheel and sdist smoke tests (core, missing extra, fastapi)
-- just release-check  ->  check + examples + docs build + smoke
+- just release-check  ->  check + examples + docs + smoke + metadata
 - just clean  ->  remove caches and build artifacts
 
 Pytest is configured with --strict-config and --strict-markers. Coverage is
@@ -103,6 +103,11 @@ capability must appear in at least one runnable example, indexed in
 examples/README.md. When a capability is added, update the guide page, the
 example, and the index together. Build the site with "just docs-build";
 serve locally with "just docs".
+
+`website/docs/release-notes.md` is the only release-history source. It contains
+explicit version sections only and is rendered directly by the site. Release
+tooling and maintainer guidance live together in `release/`. Do not recreate a
+root changelog, a second release-notes wrapper, or an `Unreleased` section.
 
 Core package:
 
@@ -198,6 +203,8 @@ Do not make FastAPI a core dependency.
 
 TestClient-only dependencies such as httpx2 are development or smoke-test
 dependencies, not public runtime requirements for wireme[fastapi].
+Both httpx and httpx2 remain development-only so the declared FastAPI lower
+bound and current FastAPI can use their respective TestClient implementations.
 
 # Testing layout
 
@@ -241,7 +248,7 @@ Build with:
 
 Validate metadata with:
 
-    uvx twine check dist/*
+    uv run twine check dist/*
 
 Smoke tests must:
 
@@ -272,8 +279,9 @@ applies:
 - New backward-compatible feature -> patch bump (0.2.1 -> 0.2.2)
 - Bug fix -> patch bump (0.2.1 -> 0.2.2)
 
-In 0.x the minor number is the breaking-change signal. Choose the next
-version from the changelog content, not from feature size.
+In 0.x the minor number is the breaking-change signal. Choose the next version
+from the user-facing changes merged since the current release, not from feature
+size.
 
 # Release process
 
@@ -285,7 +293,6 @@ Before release:
     uv sync --all-extras --all-groups
     uv run coverage erase
     just release-check
-    uvx twine check dist/*
 
 CI (.github/workflows/ci.yml) must test Python 3.12, 3.13, and 3.14.
 
@@ -293,33 +300,39 @@ CI should have separate jobs for:
 
 - core without optional FastAPI extras
 - FastAPI integration with all extras
+- declared runtime lower bounds
 - built artifact smoke tests
+- one stable aggregate `Required` result for branch protection
 
 The task runner intentionally has no release recipe. Local release commands
-must remain side-effect-free. RELEASING.md is the canonical maintainer guide.
+must remain side-effect-free. release/README.md is the canonical maintainer
+guide.
 The release path is:
 
 - workflow_dispatch on prepare-release.yml chooses a SemVer bump
-- scripts/release.py updates pyproject.toml, uv.lock, and CHANGELOG.md
+- GitHub generates notes from merged pull requests since the previous tag
+- release/prepare.py updates pyproject.toml, uv.lock, and the canonical website
+  release notes
 - a short-lived GitHub App token opens a release pull request and triggers CI
-- merging that pull request makes create-draft-release.yml create the tag and
-  a draft GitHub Release at the exact merge commit
+- a maintainer curates the generated notes in that pull request
+- merging makes create-draft-release.yml rebuild the exact merge commit, attest
+  the wheel and sdist, and attach them to a draft GitHub Release
 - publishing the reviewed draft triggers release.yml
 
 The publishing workflow verifies that the release came through the prepared
-draft, the tag matches the pyproject.toml version, the changelog contains the
-release, and the tagged commit belongs to default-branch history. It then:
+draft, is immutable, has a tag matching pyproject.toml, has canonical notes for
+that version, and belongs to default-branch history. It then:
 
-- builds and tests without publishing credentials
-- passes the verified artifacts to a separate publishing job bound to the
-  pypi environment
-- records GitHub build provenance
-- publishes to PyPI with Trusted Publishing
-- attaches the exact published artifacts to the existing GitHub Release
+- verifies the GitHub release attestation for each downloaded asset
+- verifies build provenance, signer workflow, and source commit
+- passes only the immutable wheel and sdist to the protected pypi job
+- publishes those exact assets through Trusted Publishing
 
 Repository settings must protect the pypi environment with required reviewers,
 prevent self-review, and restrict deployments to v* tags. The workflow file
-selects the environment but cannot configure those protections itself.
+selects the environment but cannot configure those protections itself. Enable
+GitHub release immutability and require only the aggregate `Required` CI check
+on the default branch.
 
 The release-automation environment owns RELEASE_APP_CLIENT_ID and
 RELEASE_APP_PRIVATE_KEY for a GitHub App limited to contents and pull-request

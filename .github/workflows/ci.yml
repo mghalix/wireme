@@ -132,6 +132,46 @@ jobs:
       - name: Run examples
         run: ./scripts/examples
 
+  lower-bounds:
+    name: Runtime lower bounds
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
+        with:
+          version: "0.11.18"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install Python
+        run: uv python install 3.12
+
+      - name: Install locked test environment
+        run: uv sync --locked --all-extras --all-groups --python 3.12
+
+      - name: Select declared runtime lower bounds
+        run: >
+          uv pip install
+          --python .venv/bin/python
+          --resolution lowest-direct
+          --reinstall
+          --refresh
+          ".[fastapi]"
+
+      - name: Show selected runtime versions
+        run: uv pip tree --python .venv/bin/python --package wireme --depth 1
+
+      - name: Test runtime lower bounds
+        run: >
+          uv run --no-sync --python 3.12
+          pytest tests/unit tests/integration
+
   automation:
     name: Automation
     runs-on: ubuntu-latest
@@ -232,10 +272,36 @@ jobs:
         run: uv build --no-sources
 
       - name: Check metadata
-        run: uvx twine check dist/*
+        run: uv run twine check dist/*
 
       - name: Verify the DI-only wheel
         run: ./scripts/smoke "$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
 
       - name: Verify the DI-only source distribution
         run: ./scripts/smoke "$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)"
+
+  required:
+    name: Required
+    if: always()
+    needs:
+      - core
+      - fastapi
+      - lower-bounds
+      - automation
+      - docs
+      - smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fail when a required job did not pass
+        if: >-
+          needs.core.result != 'success' ||
+          needs.fastapi.result != 'success' ||
+          needs.lower-bounds.result != 'success' ||
+          needs.automation.result != 'success' ||
+          needs.docs.result != 'success' ||
+          needs.smoke.result != 'success'
+        run: exit 1
+
+      - name: Confirm required jobs passed
+        run: echo "All required CI jobs passed"

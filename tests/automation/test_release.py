@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from scripts.release import (
+from release.prepare import (
     Bump,
     _bump_version,
-    _default_changelog,
-    _prepare_changelog,
+    _normalize_generated_notes,
     _prepare_release,
+    _prepend_release,
     _read_project_version,
     _release_notes,
     _ReleaseError,
@@ -37,74 +37,97 @@ def test_bump_version_uses_semver(bump: Bump, expected: str) -> None:
     assert actual == expected
 
 
-def test_prepare_changelog_moves_unreleased_changes() -> None:
+def test_prepend_release_adds_version_before_existing_history() -> None:
     # Given
-    changelog = "# Changelog\n\n## Unreleased\n\n- A change.\n\n## 0.1.1 - 2026-07-16\n"
+    history = "# Release notes\n\nIntro.\n\n## 0.1.1 - 2026-07-16\n\n- Old.\n"
 
     # When
-    actual = _prepare_changelog(changelog, "0.1.2", date(2026, 7, 17))
+    actual = _prepend_release(
+        history,
+        "0.1.2",
+        date(2026, 7, 17),
+        "## What's Changed\n\n* fix: new behavior.\n",
+    )
 
     # Then
     assert actual == (
-        "# Changelog\n\n"
-        "## Unreleased\n\n"
+        "# Release notes\n\n"
+        "Intro.\n\n"
         "## 0.1.2 - 2026-07-17\n\n"
-        "- A change.\n\n"
-        "## 0.1.1 - 2026-07-16\n"
+        "### What's Changed\n\n"
+        "* fix: new behavior.\n\n"
+        "## 0.1.1 - 2026-07-16\n\n"
+        "- Old.\n"
     )
 
 
-def test_prepare_changelog_rejects_empty_unreleased_section() -> None:
+def test_prepend_release_rejects_existing_version() -> None:
     # Given
-    changelog = "# Changelog\n\n## Unreleased\n\n## 0.1.1 - 2026-07-16\n"
+    history = "# Release notes\n\n## 0.1.2 - 2026-07-17\n\n- Existing.\n"
 
     # When / Then
-    with pytest.raises(_ReleaseError, match="no Unreleased changes"):
-        _prepare_changelog(changelog, "0.1.2", date(2026, 7, 17))
+    with pytest.raises(_ReleaseError, match="already contain"):
+        _prepend_release(history, "0.1.2", date(2026, 7, 17), "- New.\n")
 
 
-def test_prepare_changelog_preserves_bracketed_release_headings() -> None:
+def test_normalize_generated_notes_rejects_empty_content() -> None:
     # Given
-    changelog = (
-        "# Release Notes\n\n## Unreleased\n\n- A change.\n\n## [0.4.3] - 2026-07-17\n"
+    generated = (
+        "<!-- Release notes generated using configuration in repo -->\n\n"
+        "## What's Changed\n\n"
+        "**Full Changelog**: https://example.test/v0.1.1...v0.1.2\n"
     )
 
-    # When
-    actual = _prepare_changelog(changelog, "0.4.4", date(2026, 7, 18))
-
-    # Then
-    assert "## [0.4.4] - 2026-07-18" in actual
-    assert _release_notes(actual, "0.4.4") == "- A change.\n"
+    # When / Then
+    with pytest.raises(_ReleaseError, match="empty"):
+        _normalize_generated_notes(generated)
 
 
-def test_default_changelog_supports_release_notes_name(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("history", "expected_heading"),
+    [
+        (
+            "# Release notes\n\n## [0.4.3] - 2026-07-17\n\n- Old.\n",
+            "## [0.4.4] - 2026-07-18",
+        ),
+        (
+            "# Release notes\n\n## 0.4.3 (2026-07-17)\n\n- Old.\n",
+            "## 0.4.4 (2026-07-18)",
+        ),
+        (
+            "# Release notes\n\n## v0.4.3 (2026-07-17)\n\n- Old.\n",
+            "## v0.4.4 (2026-07-18)",
+        ),
+    ],
+)
+def test_prepend_release_preserves_heading_style(
+    history: str,
+    expected_heading: str,
 ) -> None:
-    # Given
-    release_notes = tmp_path / "release-notes.md"
-    release_notes.write_text("# Release Notes\n")
-    monkeypatch.chdir(tmp_path)
-
     # When
-    actual = _default_changelog()
+    actual = _prepend_release(history, "0.4.4", date(2026, 7, 18), "- New.\n")
 
     # Then
-    assert actual == Path("release-notes.md")
+    assert expected_heading in actual
+    assert _release_notes(actual, "0.4.4") == "- New.\n"
 
 
-def test_prepare_release_updates_uv_project_and_changelog(tmp_path: Path) -> None:
+def test_prepare_release_updates_uv_project_and_release_notes(tmp_path: Path) -> None:
     # Given
     project = tmp_path / "pyproject.toml"
     project.write_text(
         '[project]\nname = "demo"\nversion = "0.1.1"\nrequires-python = ">=3.12"\n'
     )
-    changelog = tmp_path / "CHANGELOG.md"
-    changelog.write_text("# Changelog\n\n## Unreleased\n\n- New release.\n")
+    history = tmp_path / "release-notes.md"
+    history.write_text("# Release notes\n\n## 0.1.1 - 2026-07-16\n\n- Old.\n")
+    generated = tmp_path / "generated.md"
+    generated.write_text("## What's Changed\n\n* feat: new release.\n")
 
     # When
     actual = _prepare_release(
         project,
-        changelog,
+        history,
+        generated,
         "patch",
         date(2026, 7, 17),
     )
@@ -112,39 +135,37 @@ def test_prepare_release_updates_uv_project_and_changelog(tmp_path: Path) -> Non
     # Then
     assert actual == "0.1.2"
     assert _read_project_version(project) == "0.1.2"
-    assert "## 0.1.2 - 2026-07-17" in changelog.read_text()
+    assert "## 0.1.2 - 2026-07-17" in history.read_text()
     assert (tmp_path / "uv.lock").is_file()
 
 
 def test_release_notes_extracts_requested_version() -> None:
     # Given
-    changelog = (
-        "# Changelog\n\n"
-        "## Unreleased\n\n"
+    history = (
+        "# Release notes\n\n"
         "## 0.1.2 - 2026-07-17\n\n"
+        "### Fixes\n\n"
         "- New release.\n\n"
         "## 0.1.1 - 2026-07-16\n\n"
         "- Previous release.\n"
     )
 
     # When
-    actual = _release_notes(changelog, "0.1.2")
+    actual = _release_notes(history, "0.1.2")
 
     # Then
-    assert actual == "- New release.\n"
+    assert actual == "### Fixes\n\n- New release.\n"
 
 
 def test_verify_tag_checks_version_and_release_notes(tmp_path: Path) -> None:
     # Given
     project = tmp_path / "pyproject.toml"
     project.write_text('[project]\nname = "demo"\nversion = "0.1.2"\n')
-    changelog = tmp_path / "CHANGELOG.md"
-    changelog.write_text(
-        "# Changelog\n\n## Unreleased\n\n## 0.1.2 - 2026-07-17\n\n- New release.\n"
-    )
+    history = tmp_path / "release-notes.md"
+    history.write_text("# Release notes\n\n## 0.1.2 - 2026-07-17\n\n- New release.\n")
 
     # When
-    _verify_tag(project, changelog, "v", "v0.1.2")
+    _verify_tag(project, history, "v", "v0.1.2")
 
     # Then
     assert _read_project_version(project) == "0.1.2"
@@ -154,9 +175,9 @@ def test_verify_tag_rejects_mismatched_tag(tmp_path: Path) -> None:
     # Given
     project = tmp_path / "pyproject.toml"
     project.write_text('[project]\nname = "demo"\nversion = "0.1.2"\n')
-    changelog = tmp_path / "CHANGELOG.md"
-    changelog.write_text("# Changelog\n\n## Unreleased\n")
+    history = tmp_path / "release-notes.md"
+    history.write_text("# Release notes\n")
 
     # When / Then
     with pytest.raises(_ReleaseError, match="does not match expected tag"):
-        _verify_tag(project, changelog, "v", "v0.2.0")
+        _verify_tag(project, history, "v", "v0.2.0")

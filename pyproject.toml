@@ -25,21 +25,23 @@ dependencies = ["fast-depends>=3.0.8,<3.1"]
 Homepage = "https://github.com/mghalix/wireme"
 Repository = "https://github.com/mghalix/wireme"
 Issues = "https://github.com/mghalix/wireme/issues"
-Changelog = "https://github.com/mghalix/wireme/blob/main/CHANGELOG.md"
+Changelog = "https://wireme.mghalix.com/release-notes/"
 
 [project.optional-dependencies]
-fastapi = ["fastapi>=0.128,<1"]
+fastapi = ["fastapi>=0.128.2,<1"]
 
 [dependency-groups]
 dev = [
     "basedpyright",
     "commitizen>=4.16.5",
+    "httpx>=0.23,<1",
     "httpx2>=2.7.0",
     "prek>=0.4.10",
     "pytest",
     "pytest-cov",
     "ruff",
     "trio",
+    "twine>=6.2.0",
     "vulture>=2.16",
     "zizmor>=1.27.0",
 ]
@@ -78,7 +80,7 @@ show_missing = true
 skip_covered = true
 
 [tool.vulture]
-paths = ["src", "scripts", "tests", "examples"]
+paths = ["src", "release", "scripts", "tests", "examples"]
 min_confidence = 100
 
 [tool.commitizen]
@@ -92,7 +94,7 @@ include = [
   "tests/automation",
   "tests/typing",
   "examples",
-  "scripts/release.py",
+  "release/prepare.py",
 ]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"

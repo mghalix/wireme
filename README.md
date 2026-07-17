@@ -166,7 +166,8 @@ small, opinionated facade with:
 Wireme follows [SemVer](https://semver.org) with the strict 0.x mapping:
 below 1.0.0, a breaking change bumps minor and features or fixes bump patch,
 so the minor number is the breaking-change signal. Published artifacts are
-immutable; a broken release is fixed by publishing a new version.
+immutable; a broken release is fixed by publishing a new version. See the
+[release notes](https://wireme.mghalix.com/release-notes/).
 
 ## License
 

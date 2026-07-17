@@ -15,4 +15,6 @@ Decisions 0001-0017 were recorded on 2026-07-16 while preparing the 0.1.1
 release (core facade, FastAPI integration, style conventions, versioning
 policy, the wire configuration surface, the documentation layout, project
 defaults, member selection, and the documentation site). Decision 0018 was
-recorded on 2026-07-17 to establish a strict DI-only boundary.
+recorded on 2026-07-17 to establish a strict DI-only boundary. Decision 0019
+was recorded on 2026-07-18 to establish one versioned history, a cohesive
+release tooling boundary, and immutable assets as the PyPI handoff.
