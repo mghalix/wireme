@@ -1,6 +1,6 @@
 # ADR 0013: wire configuration (cast, cast_result, requires); rejected extension surfaces
 
-- Status: Accepted
+- Status: Superseded by 0018
 - Date: 2026-07-16
 
 ## Context

@@ -7,9 +7,10 @@
   </picture>
 </p>
 
-Tiny, typed dependency injection for Python, powered by FastDepends.
+Tiny, typed dependency injection for Python. Resolve the graph. Touch nothing
+else.
 
-Wireme keeps dependency injection explicit and small:
+Powered by FastDepends, Wireme keeps dependency injection explicit and small:
 
 ```python
 from wireme import Wired, override_dependency, wire, wired
@@ -20,6 +21,10 @@ from wireme import Wired, override_dependency, wire, wired
 - `wired(factory)` declares how a dependency is created.
 - `Wired()` marks a reusable `Annotated` dependency as caller-optional.
 - `override_dependency()` temporarily replaces a dependency in tests.
+
+Wireme only resolves dependencies. It never validates or coerces arguments,
+dependency results, or return values; application boundaries own those
+concerns.
 
 ## Installation
 
@@ -102,7 +107,7 @@ app = FastAPI()
 
 
 @app.get("/users")
-def list_users(service: FromWeb[UserService]) -> list[str]:
+def list_users(*, service: FromWeb[UserService]) -> list[str]:
     return service.list_users()
 ```
 
@@ -120,7 +125,6 @@ in the repository; the guide covers one concept per page, in reading order:
 | [Resources](https://github.com/mghalix/wireme/blob/main/website/docs/guide/resources.md) | Async factories and generator cleanup |
 | [Testing](https://github.com/mghalix/wireme/blob/main/website/docs/guide/testing.md) | Overrides and explicit values |
 | [Side-effect dependencies](https://github.com/mghalix/wireme/blob/main/website/docs/guide/side-effects.md) | Guards and auditing with `requires` |
-| [Validation control](https://github.com/mghalix/wireme/blob/main/website/docs/guide/validation.md) | `cast` flags and error types |
 | [Protocol dependencies](https://github.com/mghalix/wireme/blob/main/website/docs/guide/protocols.md) | Depending on interfaces |
 | [FastAPI integration](https://github.com/mghalix/wireme/blob/main/website/docs/guide/fastapi.md) | `FromWeb`, request-scoped resources, web overrides |
 | [Building integrations](https://github.com/mghalix/wireme/blob/main/website/docs/guide/extending.md) | Wireme as your project's DI primitive |
@@ -132,12 +136,10 @@ Every capability also has a small runnable example; see the
 
 | Name                  | Purpose                                                         |
 | --------------------- | --------------------------------------------------------------- |
-| `wire`                | Decorate a class, function, or method and enable dependency resolution. Accepts `cast`, `cast_result`, and `requires`. |
-| `wired`               | Declare a dependency factory and its resolution options.        |
+| `wire`                | Decorate a class, function, or method and enable dependency resolution. Accepts side-effect dependencies through `requires`. |
+| `wired`               | Declare a dependency factory and its per-call cache behavior.   |
 | `Wired`               | Mark an `Annotated` dependency as caller-optional.              |
 | `override_dependency` | Temporarily replace a factory, with nested restoration.         |
-| `WiremeError`         | Base error exposed by Wireme.                                   |
-| `ValidationError`     | Dependency validation error.                                    |
 
 The optional `wireme.fastapi` integration adds:
 
@@ -156,6 +158,7 @@ small, opinionated facade with:
 - Reusable `Annotated` dependencies.
 - Injected parameters hidden from public runtime signatures.
 - Nested-safe dependency overrides.
+- A DI-only contract: values pass through unchanged.
 - A minimal backend-independent public namespace.
 
 ## Versioning

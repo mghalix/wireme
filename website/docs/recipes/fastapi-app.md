@@ -58,7 +58,7 @@ router = APIRouter()
 
 
 @router.get("/users")
-def list_users(service: FromWeb[UserServiceDep]) -> list[str]:
+def list_users(*, service: FromWeb[UserServiceDep]) -> list[str]:
     return service.list_users()
 ```
 

@@ -10,10 +10,10 @@ import functools
 from collections.abc import Callable
 from typing import cast
 
-from wireme import WiremeError, wired
+from wireme import wired
 
 
-class ServiceUnavailableError(WiremeError):
+class ServiceUnavailableError(RuntimeError):
     pass
 
 
@@ -38,6 +38,9 @@ def require_service[T](service_type: type[T]) -> Callable[[], T]:
 def wired_service[T](service_type: type[T]) -> T:
     return wired(require_service(service_type))
 ```
+
+`typing.cast` above is static-only; it does not transform the registered
+object. Wireme likewise injects that object unchanged.
 
 Caching the generated factory gives it stable identity, which is important
 when using `override_dependency()`.

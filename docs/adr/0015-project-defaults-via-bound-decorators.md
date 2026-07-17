@@ -1,6 +1,6 @@
 # ADR 0015: Project-wide defaults via bound decorators, not global config
 
-- Status: Accepted
+- Status: Superseded by 0018
 - Date: 2026-07-16
 
 ## Context

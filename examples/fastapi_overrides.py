@@ -53,7 +53,7 @@ app = FastAPI()
 
 
 @app.get("/")
-def read_service(service: FromWeb[UserServiceDep]) -> dict[str, str]:
+def read_service(*, service: FromWeb[UserServiceDep]) -> dict[str, str]:
     return {"database": service.database.name}
 
 

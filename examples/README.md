@@ -16,12 +16,9 @@ uv run python examples/basic.py
 | Constructor and method injection               | `classes.py`             |
 | Nested factories and per-call caching          | `nested.py`              |
 | Class, instance, and method factories          | `factories.py`           |
-| Pydantic constraints without models            | `field_constraints.py`   |
 | Process-wide singletons                        | `singletons.py`          |
 | Generator and async resource cleanup           | `resources.py`           |
 | Side-effect dependencies (`requires`) with injected context | `requires.py` |
-| Validation control (`cast`, `cast_result`)     | `validation.py`          |
-| Project-wide defaults via a bound decorator    | `project_defaults.py`    |
 | Wiring many methods with an apply combinator   | `method_wiring.py`       |
 | Test overrides                                 | `overrides.py`           |
 | Protocol-typed dependencies                    | `protocols.py`           |

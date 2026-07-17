@@ -15,8 +15,9 @@ from wireme.fastapi import FromWeb, override_web_dependency
 Ownership is split deliberately:
 
 - FastAPI owns the request-facing dependency lifecycle.
+- FastAPI validates request-facing inputs.
 - Wireme owns the internal dependency graph behind constructors and
-  factories.
+  factories and passes its values through unchanged.
 
 `import wireme` never requires FastAPI. Importing `wireme.fastapi` without
 the extra raises `ModuleNotFoundError` with an actionable message:
@@ -50,7 +51,7 @@ app = FastAPI()
 
 
 @app.get("/users")
-def list_users(service: FromWeb[UserService]) -> list[str]:
+def list_users(*, service: FromWeb[UserService]) -> list[str]:
     return service.list_users()
 ```
 
@@ -73,7 +74,7 @@ type UserServiceDep = Annotated[
 
 
 @app.get("/users")
-def list_users(service: FromWeb[UserServiceDep]) -> list[str]:
+def list_users(*, service: FromWeb[UserServiceDep]) -> list[str]:
     return service.list_users()
 ```
 
@@ -106,7 +107,7 @@ type ConnectionDep = Annotated[
 
 
 @app.get("/report")
-def report(connection: FromWeb[ConnectionDep]) -> dict[str, str]:
+def report(*, connection: FromWeb[ConnectionDep]) -> dict[str, str]:
     return {"status": connection.status()}
 ```
 

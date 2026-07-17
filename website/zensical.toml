@@ -1,9 +1,9 @@
 # Wireme documentation - Zensical config.
-# Serve:  uvx zensical serve -o        Build:  uvx zensical build  (-> site/)
+# Serve/build through the pinned commands in the repository justfile.
 
 [project]
 site_name = "Wireme"
-site_description = "Tiny, typed dependency injection for Python, powered by FastDepends. Explicit, opinionated, and small enough to learn in an afternoon."
+site_description = "Tiny, typed dependency injection for Python. Resolve the graph. Touch nothing else."
 site_author = "Mohanad Ghali"
 site_url = "https://wireme.mghalix.com/"
 copyright = "Copyright &copy; 2026 Mohanad Ghali"
@@ -24,7 +24,6 @@ nav = [
     { "Resources" = "guide/resources.md" },
     { "Testing" = "guide/testing.md" },
     { "Side-effect dependencies" = "guide/side-effects.md" },
-    { "Validation control" = "guide/validation.md" },
     { "Protocol dependencies" = "guide/protocols.md" },
     { "FastAPI integration" = "guide/fastapi.md" },
     { "Building integrations" = "guide/extending.md" },

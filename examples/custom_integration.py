@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable
-from typing import Protocol, cast, runtime_checkable
+from typing import Protocol, cast
 
-from wireme import WiremeError, wire, wired
+from wireme import wire, wired
 
 
-class ServiceUnavailableError(WiremeError):
+class ServiceUnavailableError(RuntimeError):
     pass
 
 
@@ -30,7 +30,7 @@ def require_service[T](service_type: type[T]) -> Callable[[], T]:
                 f"{service_type.__name__} is not registered."
             ) from error
 
-        return cast(T, service)
+        return cast(T, service)  # static-only; the object stays unchanged
 
     return dependency
 
@@ -40,7 +40,6 @@ def wired_service[T](service_type: type[T]) -> T:
     return wired(require_service(service_type))
 
 
-@runtime_checkable
 class Storage(Protocol):
     def write(self, path: str, data: bytes) -> None: ...
 
@@ -54,6 +53,7 @@ class LocalStorage:
 def save_document(
     path: str,
     data: bytes,
+    *,
     storage: Storage = wired_service(Storage),  # noqa: B008
 ) -> None:
     storage.write(path, data)

@@ -12,7 +12,6 @@ gives the dependency one name across the whole project:
 
 ```python
 type DatabaseDep = Annotated[Database, wired(get_database)]
-type Limit = Annotated[int, Field(gt=0, le=100)]
 ```
 
 An alias is also the unit FastAPI bridging understands: `FromWeb[DatabaseDep]`
@@ -40,6 +39,14 @@ passed to `requires`, are recipes the engine calls: they stay plain
 functions and are never invoked directly once they declare `Wired()`
 parameters of their own.
 
+## Resolve the graph; touch nothing else
+
+Wireme never validates, coerces, or serializes values. Annotations carry
+static types and dependency declarations; factories and callers keep ordinary
+Python semantics. Validate HTTP input in FastAPI, configuration in the
+settings object, and domain invariants in the constructor that owns them.
+([ADR 0018](https://github.com/mghalix/wireme/blob/main/docs/adr/0018-di-only-without-validation-or-casting.md))
+
 ## Wire classes at the class head
 
 Constructor injection uses the class decorator, which wires exactly the
@@ -55,7 +62,7 @@ class UserService:
 
 ## Singletons are named factories
 
-A module-level instance behind a named factory fails fast at import; a
+A module-level instance behind a named factory can fail fast at import; a
 `functools.cache` factory creates lazily. Never `wired(lambda: service)`:
 each lambda is a distinct factory, so overrides cannot target it.
 ([ADR 0007](https://github.com/mghalix/wireme/blob/main/docs/adr/0007-singletons-via-named-factories.md))
@@ -67,17 +74,6 @@ live through streaming, endpoint exceptions reach your generators, and
 `override_web_dependency` sees everything. Wiring endpoints directly with
 `@wire` is supported, but it is the secondary form with documented
 tradeoffs. ([ADR 0008](https://github.com/mghalix/wireme/blob/main/docs/adr/0008-fromweb-primary-wired-endpoints-secondary.md))
-
-## Project defaults are a binding, not a global
-
-```python
-# myapp/di.py
-wire = wireme.wire(cast=False, cast_result=False)
-```
-
-Import that binding everywhere instead of configuring a process-global,
-which would be import-order dependent and would leak into libraries.
-([ADR 0015](https://github.com/mghalix/wireme/blob/main/docs/adr/0015-project-defaults-via-bound-decorators.md))
 
 ## Explicit values are keyword-only and win
 
