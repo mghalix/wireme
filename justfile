@@ -36,10 +36,23 @@ audit-actions persona="auditor" severity="low":
         --min-severity "{{ severity }}" \
         .
 
+# Install the repository-managed commit message hook.
+hooks:
+    uv run prek install --hook-type commit-msg
+
+# Validate the hook configuration.
+hooks-check:
+    uv run prek validate-config .pre-commit-config.yaml
+
+# Validate commits made after the selected base revision.
+commits base="origin/main":
+    uv run cz check --rev-range "{{ base }}..HEAD"
+
 check:
     uv run ruff format --check .
     uv run ruff check .
     uv run basedpyright
+    just hooks-check
     just dead-code
     just audit-actions
     uv run pytest \

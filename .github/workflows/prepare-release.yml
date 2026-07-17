@@ -122,12 +122,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- CHANGELOG.md pyproject.toml uv.lock
           git diff --cached --check
-          git commit -m "release: ${RELEASE_TAG}"
+          git commit -m "chore(release): ${RELEASE_TAG}"
 
           gh auth setup-git
           git push --set-upstream origin "${branch}"
           gh pr create \
             --base "${DEFAULT_BRANCH}" \
             --head "${branch}" \
-            --title "Release ${RELEASE_TAG}" \
+            --title "chore(release): ${RELEASE_TAG}" \
             --body "Prepare ${RELEASE_TAG}. Review the version and changelog; merge only after CI passes."
