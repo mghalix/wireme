@@ -60,12 +60,12 @@ app = FastAPI()
 
 
 @app.get("/constructed")
-def constructed(service: FromWeb[UserService]) -> dict[str, str]:
+def constructed(*, service: FromWeb[UserService]) -> dict[str, str]:
     return {"message": service.describe()}
 
 
 @app.get("/bridged")
-def bridged(service: FromWeb[UserServiceDep]) -> dict[str, str]:
+def bridged(*, service: FromWeb[UserServiceDep]) -> dict[str, str]:
     return {"message": service.describe()}
 
 

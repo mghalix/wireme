@@ -12,7 +12,7 @@ temporary="$(mktemp -d)"
 
 trap 'rm -rf "${temporary}"' EXIT
 
-echo "==> ${artifact##*/}: core install without extras"
+echo "==> ${artifact##*/}: DI-only core install without extras"
 
 core_python="${temporary}/core/.venv/bin/python"
 
@@ -27,7 +27,7 @@ uv pip install \
 (cd "${temporary}/core" && "${core_python}" "${repository}/tests/smoke/core.py")
 (cd "${temporary}/core" && "${core_python}" "${repository}/tests/smoke/fastapi_missing.py")
 
-echo "==> ${artifact##*/}: install with the fastapi extra"
+echo "==> ${artifact##*/}: FastAPI extra with unchanged Wireme values"
 
 fastapi_python="${temporary}/fastapi/.venv/bin/python"
 

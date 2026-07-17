@@ -1,6 +1,6 @@
 # ADR 0001: Build Wireme as a typed facade over FastDepends
 
-- Status: Accepted
+- Status: Superseded by 0018
 - Date: 2026-07-16
 
 ## Context

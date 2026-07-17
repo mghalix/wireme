@@ -13,8 +13,14 @@ The framework-independent root API is intentionally small:
 - wired
 - wire
 - override_dependency
-- WiremeError
-- ValidationError
+
+Wireme is DI-only. It never validates, coerces, or serializes arguments,
+dependency results, or return values. FastDepends must always be invoked with
+casting and result serialization disabled explicitly, including when Pydantic
+is installed by an application or optional integration. Validation belongs at
+application boundaries or inside the objects an application constructs.
+Reject FastDepends CustomField markers; they are an upstream argument-processing
+extension surface, not part of Wireme's dependency vocabulary.
 
 The public root facade is src/wireme/__init__.py. Application code should
 import public APIs from wireme, never from private modules.
@@ -38,17 +44,22 @@ explicitly selected isolated environment.
 - uv sync --all-extras --all-groups  ->  install everything
 - uv run pytest tests/unit  ->  framework-independent tests
 - uv run pytest tests/integration -m integration  ->  FastAPI integration tests
+- uv run pytest tests/automation  ->  repository automation tests
 - uv run pytest -m 'not integration'  ->  skip integration tests
 - uv run pytest tests/unit/test_core.py::test_name  ->  single test
 - uv run basedpyright  ->  type check (strict mode)
 - uv run ruff check .  ->  lint
 - uv run ruff format .  ->  format
-- just check  ->  format check, lint, types, tests with coverage
+- just dead-code  ->  find dead Python code at 100 percent confidence
+- just dead-code 80  ->  broaden the exploratory dead-code scan
+- just audit-actions  ->  audit GitHub Actions offline as an auditor
+- just check  ->  format check, lint, types, static audits, tests with coverage
+- just examples  ->  run every documented example
 - just build  ->  uv build --no-sources into a clean dist/
 - just docs  ->  serve the docs site locally with live reload
 - just docs-build  ->  build the docs site into website/site
 - just smoke  ->  wheel and sdist smoke tests (core, missing extra, fastapi)
-- just release-check  ->  check + smoke
+- just release-check  ->  check + examples + docs build + smoke
 - just clean  ->  remove caches and build artifacts
 
 Pytest is configured with --strict-config and --strict-markers. Coverage is
@@ -79,8 +90,6 @@ Core package:
   hiding injected parameters from public runtime signatures.
 - src/wireme/_core.py isolates FastDepends imports and private compatibility
   boundaries. All FastDepends symbols enter the codebase through this module.
-- src/wireme/_errors.py exposes WiremeError (an alias of FastDepends'
-  FastDependsError) and ValidationError.
 - src/wireme/py.typed marks the package as typed.
 
 FastAPI integration:
@@ -89,7 +98,7 @@ FastAPI integration:
 - src/wireme/fastapi/_compat.py loads the optional FastAPI dependency and
   gives an actionable error when the extra is missing.
 - src/wireme/fastapi/_dependencies.py implements FromWeb and dependency
-  bridging. Bridged adapters are cached per (factory, config) so overrides
+  bridging. Bridged adapters are cached per (factory, use_cache) so overrides
   can find them.
 - src/wireme/fastapi/_overrides.py implements nested-safe FastAPI overrides.
   Routes must be registered before entering an override context so all
@@ -149,6 +158,9 @@ foundation:
 - dependency overrides
 - deterministic cleanup
 
+Completeness applies to dependency graph and lifecycle behavior, not upstream
+serializers, casting, validation, CustomField processing, or extension APIs.
+
 Do not silently provide reduced behavior through the FastAPI integration.
 Generator and async-generator dependencies must be supported with correct
 FastAPI request lifecycle semantics, not rejected merely because bridging them
@@ -170,13 +182,16 @@ dependencies, not public runtime requirements for wireme[fastapi].
 Keep test responsibilities separated:
 
     tests/
+    |-- automation/
     |-- unit/
     |-- integration/
     |   `-- fastapi/
     |-- typing/
     `-- smoke/
 
-- tests/unit contains framework-independent behavior and public API tests.
+- tests/automation contains tests for repository tooling such as release
+  preparation. It is not part of the core library test suite.
+- tests/unit contains framework-independent core behavior and public API tests.
 - tests/integration/fastapi contains real FastAPI integration tests.
 - tests/typing contains BasedPyright fixtures and is not collected by Pytest.
   It is type checked because basedpyright's include list covers it.
@@ -212,9 +227,11 @@ Smoke tests must:
 - run from a temporary working directory
 - avoid inheriting the repository's active virtual environment
 - verify core installation without extras
+- verify core installation does not include Pydantic
 - verify the exact missing-FastAPI-extra error
 - verify installation with wireme[fastapi]
 - exercise a real FastAPI request
+- verify Wireme preserves values even when FastAPI installs Pydantic
 - verify generator cleanup behavior
 
 Using "uv run --with" is not sufficient when it can reuse or layer over the
@@ -256,11 +273,40 @@ CI should have separate jobs for:
 - FastAPI integration with all extras
 - built artifact smoke tests
 
-Publishing runs from .github/workflows/release.yml on v* tags, with a check
-that the tag matches the pyproject.toml version.
+The task runner intentionally has no release recipe. Local release commands
+must remain side-effect-free. RELEASING.md is the canonical maintainer guide.
+The release path is:
 
-Do not bump a version, create a tag, publish to PyPI, or create a GitHub
-release unless explicitly instructed.
+- workflow_dispatch on prepare-release.yml chooses a SemVer bump
+- scripts/release.py updates pyproject.toml, uv.lock, and CHANGELOG.md
+- a short-lived GitHub App token opens a release pull request and triggers CI
+- merging that pull request makes create-draft-release.yml create the tag and
+  a draft GitHub Release at the exact merge commit
+- publishing the reviewed draft triggers release.yml
+
+The publishing workflow verifies that the release came through the prepared
+draft, the tag matches the pyproject.toml version, the changelog contains the
+release, and the tagged commit belongs to default-branch history. It then:
+
+- builds and tests without publishing credentials
+- passes the verified artifacts to a separate publishing job bound to the
+  pypi environment
+- records GitHub build provenance
+- publishes to PyPI with Trusted Publishing
+- attaches the exact published artifacts to the existing GitHub Release
+
+Repository settings must protect the pypi environment with required reviewers,
+prevent self-review, and restrict deployments to v* tags. The workflow file
+selects the environment but cannot configure those protections itself.
+
+The release-automation environment owns RELEASE_APP_CLIENT_ID and
+RELEASE_APP_PRIVATE_KEY for a GitHub App limited to contents and pull-request
+write access. Do not replace it with the default GITHUB_TOKEN; pull requests
+created by that token do not trigger normal CI. Do not use a maintainer's
+personal token when a short-lived installation token is available.
+
+Do not bump a version, create a tag, publish to PyPI, or create a GitHub release
+locally. Release mutations belong to the reviewed workflows only.
 
 Published artifacts are immutable. A broken release must be fixed by
 publishing a new version.

@@ -56,6 +56,17 @@ import inspect
 assert str(inspect.signature(process_text)) == "(text: str) -> None"
 ```
 
+## Values pass through unchanged
+
+Wireme uses annotations for typing and dependency declarations, not runtime
+validation. Arguments, factory results, and return values keep normal Python
+semantics and are never coerced by the DI layer.
+
+Validate untrusted data at the application boundary that receives it, or in
+the model or constructor responsible for the value. Under the optional web
+integration, FastAPI continues to validate request-facing input while Wireme
+resolves the internal dependency graph unchanged.
+
 ## Reusable dependencies
 
 Use `Annotated` when the same dependency appears in multiple callables:
@@ -96,15 +107,12 @@ the dependency graph.
 ## Ruff configuration
 
 Ruff's `B008` rule normally rejects function calls in defaults. Tell Ruff
-that `Wired()` is an immutable marker:
+that Wireme's declaration markers are immutable:
 
 ```toml
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["wireme.Wired"]
+extend-immutable-calls = ["wireme.Wired", "wireme.wired"]
 ```
-
-Declarations using `wired(factory)` may also need your project's normal DI
-rule configuration, depending on which Ruff rules are enabled.
 
 ## Runnable example
 

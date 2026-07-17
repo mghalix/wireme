@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-from fast_depends.exceptions import FastDependsError
-from fast_depends.exceptions import ValidationError as FastDependsValidationError
+import inspect
 
 import wireme
-from wireme import ValidationError, WiremeError
 
 _EXPECTED_PUBLIC_API = (
-    "ValidationError",
     "Wired",
-    "WiremeError",
     "override_dependency",
     "wire",
     "wired",
@@ -20,13 +16,19 @@ def test_public_api() -> None:
     assert wireme.__all__ == _EXPECTED_PUBLIC_API
 
 
-def test_wireme_error_aliases_fast_depends_error() -> None:
-    assert WiremeError is FastDependsError
+def test_validation_errors_are_not_exported() -> None:
+    assert not hasattr(wireme, "ValidationError")
+    assert not hasattr(wireme, "WiremeError")
 
 
-def test_validation_error_is_reexported() -> None:
-    assert ValidationError is FastDependsValidationError
-    assert issubclass(ValidationError, WiremeError)
+def test_casting_options_are_not_supported() -> None:
+    wire_parameters = inspect.signature(wireme.wire).parameters
+    wired_parameters = inspect.signature(wireme.wired).parameters
+
+    assert "cast" not in wire_parameters
+    assert "cast_result" not in wire_parameters
+    assert "cast" not in wired_parameters
+    assert "cast_result" not in wired_parameters
 
 
 def test_fastapi_integration_is_not_exported_from_root() -> None:

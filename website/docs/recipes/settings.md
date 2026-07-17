@@ -28,6 +28,7 @@ type SettingsDep = Annotated[Settings, wired(get_settings)]
 
 1. Constructing at module scope validates the environment at import time:
    a missing `DATABASE_URL` fails the deployment, not the first request.
+   `Settings` owns that validation; Wireme only injects the constructed object.
 
 Every consumer declares the alias and receives the same instance:
 

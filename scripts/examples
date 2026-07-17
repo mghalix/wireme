@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Run every documented example against the current project environment.
+
+set -euo pipefail
+
+repository="$(cd "$(dirname "$0")/.." && pwd)"
+
+cd "${repository}"
+
+for example in examples/*.py; do
+    echo "== ${example}"
+    uv run --no-sync python "${example}"
+done

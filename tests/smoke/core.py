@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.util
+import typing
 from typing import Annotated
 
 from wireme import Wired, override_dependency, wire, wired
@@ -28,4 +30,13 @@ with override_dependency(get_value, get_test_value):
 
 assert operation() == "production"
 
-print("wireme smoke test passed")
+
+@wire
+def passthrough(value: int) -> int:
+    return value
+
+
+assert passthrough(typing.cast("int", "1")) == "1"
+assert importlib.util.find_spec("pydantic") is None
+
+print("wireme DI-only core smoke test passed")

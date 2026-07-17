@@ -18,7 +18,7 @@ class Settings:
         self.environment = environment
 
 
-settings = Settings()  # validates configuration once, at import time
+settings = Settings()  # constructed once, at import time
 
 
 def get_settings() -> Settings:

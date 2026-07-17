@@ -115,8 +115,8 @@ def get_failing_session(
     connection: GeneratorConnectionDep = Wired(),
 ) -> Iterator[Session]:
     events.append("fail")
+    yield from ()
     raise RuntimeError("session failed")
-    yield Session(connection)
 
 
 type FailingSessionDep = Annotated[

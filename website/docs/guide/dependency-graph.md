@@ -53,6 +53,7 @@ type SettingsDep = Annotated[Settings, wired(get_settings)]
 Creating the instance at module scope fails fast: a misconfigured
 environment stops the application at import, before any request runs. This
 fits pydantic settings and similar validate-on-construction objects.
+The settings object owns that validation; Wireme only resolves its factory.
 
 When lazy creation is acceptable, cache the factory instead and drop the
 module-level instance:

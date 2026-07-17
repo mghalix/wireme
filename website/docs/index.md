@@ -15,8 +15,9 @@ hide:
 <p align="center"><strong>Tiny, typed dependency injection for Python.</strong></p>
 
 <p align="center">
-Powered by FastDepends. Explicit, opinionated, and small enough to learn in
-an afternoon: four names cover the whole core.
+Resolve the graph. Touch nothing else. Powered by FastDepends, explicit,
+opinionated, and small enough to learn in an afternoon: four names cover the
+whole core.
 </p>
 
 ---
@@ -82,8 +83,8 @@ New here? Start with [Getting started](guide/getting-started.md), skim
   static type together; BasedPyright strict passes on every example.
 - **Hidden wiring.** Injected parameters vanish from runtime signatures, so
   editors, `help()`, and OpenAPI schemas see only real inputs.
-- **Validation for free.** Any pydantic annotation constrains a parameter,
-  no `BaseModel` or `TypeAdapter` needed for one value.
+- **DI only.** Values pass through unchanged; validation and coercion stay at
+  application boundaries where their ownership is explicit.
 - **Real lifecycles.** Generator factories open and close resources around
   the call, or around the whole request under FastAPI, including streaming.
 - **Test-first overrides.** Nested-safe, exception-safe factory replacement
@@ -105,7 +106,7 @@ app = FastAPI()
 
 
 @app.post("/users/{username}")
-def create_user(username: str, database: FromWeb[DatabaseDep]) -> None:
+def create_user(username: str, *, database: FromWeb[DatabaseDep]) -> None:
     database.write(username)
 ```
 

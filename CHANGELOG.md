@@ -3,6 +3,24 @@
 Wireme follows SemVer with the strict 0.x mapping: breaking changes bump
 minor, features and fixes bump patch (docs/adr/0012).
 
+## Unreleased
+
+- Remove `cast` and `cast_result` from `wire` and `wired`; Wireme now preserves
+  arguments, dependency results, and return values exactly as supplied.
+- Remove `ValidationError` and `WiremeError` from the public root facade.
+- Remove the Pydantic runtime dependency and explicitly disable every
+  FastDepends serializer path, including FastAPI bridges.
+- Constrain FastDepends to the tested 3.0.x line and add core and integration
+  regressions for serializer-free behavior.
+- Reject FastDepends CustomField markers so upstream argument-processing
+  extensions cannot leak through Wireme's DI-only boundary.
+- Make examples and strict documentation builds part of the release check,
+  and enforce the DI-only core contract across the CI Python matrix.
+- Remove the side-effecting local release recipe. Release preparation now uses
+  a generated, reviewable pull request and draft GitHub Release, while the
+  separated publisher retains tag, history, artifact, Trusted Publishing, and
+  provenance checks.
+
 ## 0.1.1 - 2026-07-16
 
 - Replace the repository and documentation identity with approved path-only

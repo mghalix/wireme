@@ -59,4 +59,4 @@ overriding `get_current_user` changes what every guard sees.
 
 [examples/requires.py](https://github.com/mghalix/wireme/blob/main/examples/requires.py)
 
-Next: [Validation control](validation.md)
+Next: [Protocol dependencies](protocols.md)

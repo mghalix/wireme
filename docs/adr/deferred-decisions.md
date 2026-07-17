@@ -28,4 +28,4 @@ When one is decided, it becomes an ADR and the entry is removed.
   with an unrelated error, or not at all for generator factories. A
   sentinel that raises an actionable error on any use would fail fast at
   the misuse site. Decide if direct-call confusion recurs; the cost is a
-  carefully behaved sentinel (repr, equality, pydantic edge cases).
+  carefully behaved sentinel (repr, equality, framework edge cases).

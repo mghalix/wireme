@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Annotated, Protocol, runtime_checkable
+from typing import Annotated, Protocol
 
 from wireme import Wired, wire, wired
 
 
-@runtime_checkable
 class DatabaseLike(Protocol):
     def write(self, data: str) -> None: ...
 

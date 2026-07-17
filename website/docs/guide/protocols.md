@@ -1,15 +1,14 @@
 # Protocol dependencies
 
-A protocol can describe the dependency interface. When runtime validation is
-active, make the protocol runtime-checkable:
+A protocol can describe the dependency interface without imposing a concrete
+implementation:
 
 ```python
-from typing import Annotated, Protocol, runtime_checkable
+from typing import Annotated, Protocol
 
 from wireme import Wired, wire, wired
 
 
-@runtime_checkable
 class DatabaseLike(Protocol):
     def write(self, value: str) -> None: ...
 

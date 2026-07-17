@@ -64,7 +64,7 @@ app = FastAPI()
 
 
 @app.get("/")
-def read_session(session: FromWeb[SessionDep]) -> dict[str, str]:
+def read_session(*, session: FromWeb[SessionDep]) -> dict[str, str]:
     events.append("handle request")
     return {"connection": session.connection.name}
 

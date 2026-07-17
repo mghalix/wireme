@@ -7,9 +7,10 @@ from collections.abc import AsyncGenerator, Generator
 from typing import Annotated, Any
 
 import pytest
-from pydantic import AfterValidator, Field
+from fast_depends import Depends
+from fast_depends.library import CustomField
 
-from wireme import ValidationError, Wired, override_dependency, wire, wired
+from wireme import Wired, override_dependency, wire, wired
 
 
 def get_database() -> str:
@@ -215,8 +216,8 @@ def test_wire_requires_guard_sees_overridden_context() -> None:
     assert operation() == "done"
 
 
-def test_configured_wire_is_a_reusable_decorator() -> None:
-    project_wire = wire(cast=False, cast_result=False)
+def test_wire_parentheses_returns_a_reusable_decorator() -> None:
+    project_wire = wire()
 
     @project_wire
     def operation(value: str = wired(get_database)) -> str:
@@ -231,88 +232,97 @@ def test_configured_wire_is_a_reusable_decorator() -> None:
     assert Service().value == "production"
 
 
-def test_wire_cast_false_skips_argument_validation() -> None:
-    @wire(cast=False)
+def test_wire_preserves_argument_values() -> None:
+    @wire
     def operation(value: int) -> object:
         return value
 
     assert operation(typing.cast("int", "not-an-int")) == "not-an-int"
 
 
-def test_wire_cast_true_validates_arguments() -> None:
+def test_wire_preserves_return_values() -> None:
     @wire
-    def operation(value: int) -> int:
-        return value
-
-    with pytest.raises(ValidationError):
-        operation(typing.cast("int", "not-an-int"))
-
-
-def test_wire_cast_result_false_skips_return_coercion() -> None:
-    @wire(cast_result=False)
     def operation() -> int:
         return typing.cast("int", "1")
 
     assert operation() == "1"
 
 
-def test_wire_cast_result_true_coerces_return_value() -> None:
-    @wire
-    def operation() -> int:
+def test_wired_preserves_factory_results() -> None:
+    def get_number() -> int:
         return typing.cast("int", "1")
 
-    assert operation() == 1
-
-
-def test_field_default_validates_arguments() -> None:
     @wire
-    def operation(value: str = Field(..., max_length=5)) -> str:
+    def operation(*, number: int = wired(get_number)) -> object:
+        return number
+
+    assert operation() == "1"
+
+
+def test_nested_factories_preserve_shared_arguments() -> None:
+    def get_number(number: int) -> int:
+        return number
+
+    @wire
+    def operation(number: int, *, injected: int = wired(get_number)) -> object:
+        return injected
+
+    assert operation(typing.cast("int", "7")) == "7"
+
+
+def test_wired_disables_upstream_casting() -> None:
+    marker = typing.cast("Any", wired(get_database))
+
+    assert marker.cast is False
+    assert marker.cast_result is False
+
+
+def test_wire_rejects_fast_depends_custom_field_default() -> None:
+    source = typing.cast("str", CustomField())
+
+    def operation(value: str = source) -> str:
         return value
 
-    assert operation("ok") == "ok"
-
-    with pytest.raises(ValidationError):
-        operation("too-long")
-
-    with pytest.raises(ValidationError):
-        operation()
+    with pytest.raises(TypeError, match="does not support FastDepends CustomField"):
+        wire(operation)
 
 
-def test_annotated_field_constraints_validate_and_coerce() -> None:
-    @wire
-    def operation(count: Annotated[int, Field(gt=0, le=100)] = 20) -> int:
-        return count
+def test_wired_rejects_fast_depends_annotated_custom_field() -> None:
+    source = CustomField()
 
-    assert operation() == 20
-    assert operation(typing.cast("int", "7")) == 7
+    def get_value(value: Annotated[str, source]) -> str:
+        return value
 
-    with pytest.raises(ValidationError):
-        operation(0)
+    with pytest.raises(TypeError, match="does not support FastDepends CustomField"):
+        wired(get_value)
 
 
-def test_annotated_custom_validator_runs() -> None:
-    def normalize(value: str) -> str:
-        return value.strip().lower()
+def test_wire_rejects_custom_field_nested_behind_upstream_depends() -> None:
+    source = typing.cast("str", CustomField())
 
-    @wire
-    def operation(username: Annotated[str, AfterValidator(normalize)]) -> str:
-        return username
+    def get_value(value: str = source) -> str:
+        return value
 
-    assert operation("  Mo ") == "mo"
+    dependency = typing.cast("str", Depends(get_value))
+
+    def operation(*, value: str = dependency) -> str:
+        return value
+
+    with pytest.raises(TypeError, match="does not support FastDepends CustomField"):
+        wire(operation)
 
 
-def test_factory_parameters_are_validated() -> None:
-    def get_limit(limit: Annotated[int, Field(gt=0, le=100)]) -> int:
-        return limit
+def test_override_rejects_fast_depends_custom_field() -> None:
+    source = typing.cast("str", CustomField())
 
-    @wire
-    def operation(limit: int, *, checked: int = wired(get_limit)) -> int:
-        return checked
+    def replacement(value: str = source) -> str:
+        return value
 
-    assert operation(50) == 50
-
-    with pytest.raises(ValidationError):
-        operation(500)
+    with (
+        pytest.raises(TypeError, match="does not support FastDepends CustomField"),
+        override_dependency(get_database, replacement),
+    ):
+        pass
 
 
 def test_class_constructor_factory_receives_caller_arguments() -> None:
@@ -445,6 +455,39 @@ def test_override_dependency() -> None:
         assert operation() == "test"
 
     assert operation() == "production"
+
+
+def test_override_dependency_preserves_replacement_result() -> None:
+    def get_number() -> int:
+        return 1
+
+    def get_uncoerced_number() -> int:
+        return typing.cast("int", "1")
+
+    @wire
+    def operation(*, number: int = wired(get_number)) -> object:
+        return number
+
+    with override_dependency(get_number, get_uncoerced_number):
+        assert operation() == "1"
+
+
+def test_override_dependency_can_precede_dependency_registration() -> None:
+    def get_number() -> int:
+        return 1
+
+    def get_test_number() -> int:
+        return 2
+
+    with override_dependency(get_number, get_test_number):
+
+        @wire
+        def operation(*, number: int = wired(get_number)) -> int:
+            return number
+
+        assert operation() == 2
+
+    assert operation() == 1
 
 
 def test_nested_overrides_restore_outer_override() -> None:
