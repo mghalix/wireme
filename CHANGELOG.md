@@ -5,6 +5,8 @@ minor, features and fixes bump patch (docs/adr/0012).
 
 ## Unreleased
 
+## 0.2.0 - 2026-07-17
+
 - Remove `cast` and `cast_result` from `wire` and `wired`; Wireme now preserves
   arguments, dependency results, and return values exactly as supplied.
 - Remove `ValidationError` and `WiremeError` from the public root facade.
