@@ -9,10 +9,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   core:
     name: Core - Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    env:
+      PYTHON_VERSION: ${{ matrix.python-version }}
 
     strategy:
       fail-fast: false
@@ -24,33 +30,44 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
         with:
+          version: "0.11.18"
           enable-cache: true
           cache-dependency-glob: uv.lock
 
       - name: Install Python
-        run: uv python install ${{ matrix.python-version }}
+        run: uv python install "${PYTHON_VERSION}"
 
       - name: Install core dependencies without extras
         run: >
           uv sync
           --locked
           --all-groups
-          --python ${{ matrix.python-version }}
+          --python "${PYTHON_VERSION}"
 
       - name: Run core tests
         run: >
           uv run
-          --python ${{ matrix.python-version }}
+          --python "${PYTHON_VERSION}"
           pytest tests/unit
+
+      - name: Verify DI-only core contract
+        run: >
+          uv run
+          --python "${PYTHON_VERSION}"
+          python tests/smoke/core.py
 
   fastapi:
     name: FastAPI - Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    env:
+      PYTHON_VERSION: ${{ matrix.python-version }}
 
     strategy:
       fail-fast: false
@@ -62,16 +79,19 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
         with:
+          version: "0.11.18"
           enable-cache: true
           cache-dependency-glob: uv.lock
 
       - name: Install Python
-        run: uv python install ${{ matrix.python-version }}
+        run: uv python install "${PYTHON_VERSION}"
 
       - name: Install all dependencies
         run: >
@@ -79,30 +99,30 @@ jobs:
           --locked
           --all-extras
           --all-groups
-          --python ${{ matrix.python-version }}
+          --python "${PYTHON_VERSION}"
 
       - name: Check formatting
         run: >
           uv run
-          --python ${{ matrix.python-version }}
+          --python "${PYTHON_VERSION}"
           ruff format --check .
 
       - name: Lint
         run: >
           uv run
-          --python ${{ matrix.python-version }}
+          --python "${PYTHON_VERSION}"
           ruff check .
 
       - name: Type check
         run: >
           uv run
-          --python ${{ matrix.python-version }}
+          --python "${PYTHON_VERSION}"
           basedpyright
 
       - name: Run all tests with coverage
         run: >
           uv run
-          --python ${{ matrix.python-version }}
+          --python "${PYTHON_VERSION}"
           pytest
           tests/unit
           tests/integration
@@ -110,11 +130,56 @@ jobs:
           --cov-report=term-missing
 
       - name: Run examples
-        run: |
-          for example in examples/*.py; do
-            echo "== ${example}"
-            uv run --python ${{ matrix.python-version }} python "${example}"
-          done
+        run: ./scripts/examples
+
+  automation:
+    name: Automation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
+        with:
+          version: "0.11.18"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups --python 3.13
+
+      - name: Test release automation
+        run: uv run --python 3.13 pytest tests/automation
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
+        with:
+          version: "0.11.18"
+
+      - name: Install Python
+        run: uv python install 3.13
+
+      - name: Build strict documentation
+        run: >
+          cd website &&
+          uvx --with-requirements requirements.txt zensical build --strict
 
   smoke:
     name: Artifact smoke tests
@@ -122,11 +187,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
         with:
+          version: "0.11.18"
           enable-cache: true
           cache-dependency-glob: uv.lock
 
@@ -136,8 +204,8 @@ jobs:
       - name: Check metadata
         run: uvx twine check dist/*
 
-      - name: Smoke test the wheel
+      - name: Verify the DI-only wheel
         run: ./scripts/smoke "$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
 
-      - name: Smoke test the sdist
+      - name: Verify the DI-only source distribution
         run: ./scripts/smoke "$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)"
