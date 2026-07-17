@@ -53,6 +53,10 @@ explicitly selected isolated environment.
 - just dead-code  ->  find dead Python code at 100 percent confidence
 - just dead-code 80  ->  broaden the exploratory dead-code scan
 - just audit-actions  ->  audit GitHub Actions offline as an auditor
+- just hooks  ->  install the repository-managed commit message hook
+- just hooks-check  ->  validate the hook configuration
+- just commits  ->  validate commits after origin/main
+- just commits REV  ->  validate commits after another base revision
 - just check  ->  format check, lint, types, static audits, tests with coverage
 - just examples  ->  run every documented example
 - just build  ->  uv build --no-sources into a clean dist/
@@ -67,6 +71,24 @@ branch coverage with fail_under = 100. The integration marker is registered in
 pyproject.toml; integration test modules declare:
 
     pytestmark = pytest.mark.integration
+
+# Git conventions
+
+Commit messages and pull request titles follow Conventional Commits and are
+validated with Commitizen. Run `just hooks` once after cloning to install the
+local `commit-msg` hook. CI validates the hook configuration, the pull request
+title, and every commit introduced by the pull request.
+
+Use a concise lowercase type, an optional scope, and an imperative summary:
+
+    feat(fastapi): preserve generator cleanup
+    fix(core): reject custom field markers
+    docs: explain dependency overrides
+    chore(release): v0.2.1
+
+For a breaking change, add `!` before the colon and explain the break in the
+commit body. Release automation uses the `chore(release)` scope. GitHub squash
+merges must retain the validated pull request title as the final commit title.
 
 # Architecture
 

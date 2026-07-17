@@ -140,6 +140,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Install uv
@@ -154,6 +155,22 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --locked --all-groups --python 3.13
+
+      - name: Validate hook configuration
+        run: >
+          uv run
+          --python 3.13
+          prek validate-config .pre-commit-config.yaml
+
+      - name: Validate pull request title and commits
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          uv run --python 3.13 cz check --message "${PR_TITLE}"
+          uv run --python 3.13 cz check --rev-range "${BASE_SHA}..${HEAD_SHA}"
 
       - name: Test release automation
         run: uv run --python 3.13 pytest tests/automation
