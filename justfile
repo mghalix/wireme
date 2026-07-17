@@ -88,3 +88,4 @@ docs-build:
     cd website && uvx --with-requirements requirements.txt zensical build --strict
 
 release-check: check examples docs-build smoke
+    uv run twine check dist/*

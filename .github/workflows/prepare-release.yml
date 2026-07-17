@@ -12,7 +12,7 @@ on:
           - minor
           - major
       date:
-        description: Release date in YYYY-MM-DD format; defaults to today
+        description: Release date in YYYY-MM-DD format; defaults to current UTC date
         required: false
         type: string
 
@@ -90,19 +90,57 @@ jobs:
       - name: Prepare release metadata
         id: release-details
         env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
           RELEASE_BUMP: ${{ inputs.bump }}
           RELEASE_DATE: ${{ inputs.date }}
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/generated-release-notes.md
         run: |
           set -euo pipefail
 
-          arguments=(prepare "${RELEASE_BUMP}")
+          next_version="$(
+            uv run python release/prepare.py next-version "${RELEASE_BUMP}"
+          )"
+          current_tag="$(uv run python release/prepare.py release-tag)"
+          next_tag="v${next_version}"
+
+          generate_arguments=(
+            --method POST
+            "repos/${GH_REPO}/releases/generate-notes"
+            -f "tag_name=${next_tag}"
+            -f "target_commitish=${DEFAULT_BRANCH}"
+          )
+          if gh release view "${current_tag}" >/dev/null 2>&1; then
+            generate_arguments+=(-f "previous_tag_name=${current_tag}")
+          else
+            published_releases="$(
+              gh release list \
+                --limit 1 \
+                --exclude-drafts \
+                --json tagName \
+                --jq 'length'
+            )"
+            if [[ "${published_releases}" != "0" ]]; then
+              echo "Current version release ${current_tag} is missing"
+              exit 1
+            fi
+          fi
+
+          gh api "${generate_arguments[@]}" --jq '.body' > "${RELEASE_NOTES_FILE}"
+
+          arguments=(
+            prepare
+            "${RELEASE_BUMP}"
+            --notes-file "${RELEASE_NOTES_FILE}"
+          )
           if [[ -n "${RELEASE_DATE}" ]]; then
             arguments+=(--date "${RELEASE_DATE}")
           fi
 
-          uv run python scripts/release.py "${arguments[@]}"
+          uv run python release/prepare.py "${arguments[@]}"
           uv lock --check
-          tag="$(uv run python scripts/release.py release-tag)"
+          tag="$(uv run python release/prepare.py release-tag)"
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
 
       - name: Open release pull request
@@ -120,7 +158,7 @@ jobs:
           git switch -c "${branch}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- CHANGELOG.md pyproject.toml uv.lock
+          git add -- pyproject.toml uv.lock website/docs/release-notes.md
           git diff --cached --check
           git commit -m "chore(release): ${RELEASE_TAG}"
 
@@ -130,4 +168,4 @@ jobs:
             --base "${DEFAULT_BRANCH}" \
             --head "${branch}" \
             --title "chore(release): ${RELEASE_TAG}" \
-            --body "Prepare ${RELEASE_TAG}. Review the version and changelog; merge only after CI passes."
+            --body "Prepare ${RELEASE_TAG}. Curate the generated release notes, verify the version, and merge only after CI passes."

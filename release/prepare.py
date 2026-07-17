@@ -17,14 +17,20 @@ from typing import Final, Literal, cast
 type Bump = Literal["major", "minor", "patch"]
 
 _DEFAULT_PROJECT_FILE: Final = Path("pyproject.toml")
-_CHANGELOG_CANDIDATES: Final = (Path("CHANGELOG.md"), Path("release-notes.md"))
+_DEFAULT_RELEASE_NOTES_FILE: Final = Path("website/docs/release-notes.md")
 _DEFAULT_TAG_PREFIX: Final = "v"
 _SEMVER_PATTERN: Final = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 _HEADING_PATTERN: Final = re.compile(r"(?m)^## (?P<title>[^\r\n]+?)[ \t]*$")
-_PLAIN_RELEASE_PATTERN: Final = re.compile(r"^\d+\.\d+\.\d+ - \d{4}-\d{2}-\d{2}$")
+_MARKDOWN_HEADING_PATTERN: Final = re.compile(r"^(?P<marks>#{1,6}) (?P<title>.+)$")
+_RELEASE_DATE: Final = r"\d{4}-\d{2}-\d{2}"
+_PLAIN_RELEASE_PATTERN: Final = re.compile(rf"^\d+\.\d+\.\d+ - {_RELEASE_DATE}$")
 _BRACKETED_RELEASE_PATTERN: Final = re.compile(
-    r"^\[\d+\.\d+\.\d+\] - \d{4}-\d{2}-\d{2}$"
+    rf"^\[\d+\.\d+\.\d+\] - {_RELEASE_DATE}$"
 )
+_PARENTHESIZED_RELEASE_PATTERN: Final = re.compile(
+    rf"^\d+\.\d+\.\d+ \({_RELEASE_DATE}\)$"
+)
+_V_PREFIX_RELEASE_PATTERN: Final = re.compile(rf"^v\d+\.\d+\.\d+ \({_RELEASE_DATE}\)$")
 
 
 class _ReleaseError(RuntimeError):
@@ -33,7 +39,7 @@ class _ReleaseError(RuntimeError):
 
 @dataclass(frozen=True)
 class _Section:
-    """A second-level changelog section."""
+    """A second-level Markdown section."""
 
     title: str
     start: int
@@ -91,35 +97,37 @@ def _sections(content: str) -> list[_Section]:
     ]
 
 
-def _default_changelog() -> Path:
-    return next(
-        (path for path in _CHANGELOG_CANDIDATES if path.is_file()),
-        _CHANGELOG_CANDIDATES[0],
+def _version_title_pattern(version: str) -> re.Pattern[str]:
+    escaped_version = re.escape(version)
+    return re.compile(
+        rf"^(?:{escaped_version}|\[{escaped_version}\]) - {_RELEASE_DATE}$"
+        rf"|^(?:v?{escaped_version}) \({_RELEASE_DATE}\)$"
     )
 
 
-def _unreleased_section(content: str) -> _Section:
-    matches = [
-        section for section in _sections(content) if section.title == "Unreleased"
-    ]
-    if len(matches) != 1:
-        message = "CHANGELOG.md must contain exactly one '## Unreleased' section"
-        raise _ReleaseError(message)
-    return matches[0]
+def _is_release_title(title: str) -> bool:
+    return any(
+        pattern.fullmatch(title)
+        for pattern in (
+            _PLAIN_RELEASE_PATTERN,
+            _BRACKETED_RELEASE_PATTERN,
+            _PARENTHESIZED_RELEASE_PATTERN,
+            _V_PREFIX_RELEASE_PATTERN,
+        )
+    )
 
 
 def _version_section(content: str, version: str) -> _Section:
-    escaped_version = re.escape(version)
-    title_pattern = re.compile(
-        rf"^(?:{escaped_version}|\[{escaped_version}\]) - \d{{4}}-\d{{2}}-\d{{2}}$"
-    )
+    title_pattern = _version_title_pattern(version)
     matches = [
         section
         for section in _sections(content)
         if title_pattern.fullmatch(section.title)
     ]
     if len(matches) != 1:
-        message = f"CHANGELOG.md must contain exactly one release section for {version}"
+        message = (
+            f"Release notes must contain exactly one release section for {version}"
+        )
         raise _ReleaseError(message)
     return matches[0]
 
@@ -128,42 +136,79 @@ def _release_title(content: str, version: str, release_date: date) -> str:
     for section in _sections(content):
         if _BRACKETED_RELEASE_PATTERN.fullmatch(section.title):
             return f"[{version}] - {release_date.isoformat()}"
+        if _V_PREFIX_RELEASE_PATTERN.fullmatch(section.title):
+            return f"v{version} ({release_date.isoformat()})"
+        if _PARENTHESIZED_RELEASE_PATTERN.fullmatch(section.title):
+            return f"{version} ({release_date.isoformat()})"
         if _PLAIN_RELEASE_PATTERN.fullmatch(section.title):
             break
     return f"{version} - {release_date.isoformat()}"
 
 
-def _prepare_changelog(content: str, version: str, release_date: date) -> str:
-    unreleased = _unreleased_section(content)
-    changes = content[unreleased.body_start : unreleased.end].strip()
-    if not changes:
-        raise _ReleaseError("CHANGELOG.md has no Unreleased changes")
+def _normalize_generated_notes(content: str) -> str:
+    normalized: list[str] = []
+    has_substantive_content = False
+    for line in content.strip().splitlines():
+        if line.startswith("<!-- Release notes generated using configuration"):
+            continue
+        if line.startswith("**Full Changelog**:"):
+            continue
+        match = _MARKDOWN_HEADING_PATTERN.fullmatch(line)
+        if match is None:
+            normalized.append(line)
+            if line.strip():
+                has_substantive_content = True
+            continue
 
+        level = max(3, min(len(match.group("marks")) + 1, 6))
+        normalized.append(f"{'#' * level} {match.group('title')}")
+
+    notes = "\n".join(normalized).strip()
+    if not notes or not has_substantive_content:
+        raise _ReleaseError("Generated release notes are empty")
+    return notes
+
+
+def _prepend_release(
+    content: str,
+    version: str,
+    release_date: date,
+    generated_notes: str,
+) -> str:
     if any(
-        section.title in {version, f"[{version}]"}
-        or section.title.startswith((f"{version} - ", f"[{version}] - "))
+        _version_title_pattern(version).fullmatch(section.title)
         for section in _sections(content)
     ):
-        message = f"CHANGELOG.md already contains a section for {version}"
+        message = f"Release notes already contain a section for {version}"
         raise _ReleaseError(message)
 
+    notes = _normalize_generated_notes(generated_notes)
+    release_sections = [
+        section for section in _sections(content) if _is_release_title(section.title)
+    ]
+    insert_at = release_sections[0].start if release_sections else len(content)
+    prefix = content[:insert_at].rstrip()
+    suffix = content[insert_at:].lstrip()
     title = _release_title(content, version, release_date)
-    prepared = f"## Unreleased\n\n## {title}\n\n{changes}\n\n"
-    return f"{content[: unreleased.start]}{prepared}{content[unreleased.end :]}"
+    prepared = f"{prefix}\n\n## {title}\n\n{notes}\n"
+    if suffix:
+        prepared = f"{prepared}\n{suffix}"
+    return prepared
 
 
 def _release_notes(content: str, version: str) -> str:
     section = _version_section(content, version)
     notes = content[section.body_start : section.end].strip()
     if not notes:
-        message = f"CHANGELOG.md release section for {version} is empty"
+        message = f"Release notes section for {version} is empty"
         raise _ReleaseError(message)
     return f"{notes}\n"
 
 
 def _prepare_release(
     project_file: Path,
-    changelog: Path,
+    release_notes_file: Path,
+    generated_notes_file: Path,
     bump: Bump,
     release_date: date,
 ) -> str:
@@ -172,8 +217,11 @@ def _prepare_release(
 
     current_version = _read_project_version(project_file)
     next_version = _bump_version(current_version, bump)
-    prepared_changelog = _prepare_changelog(
-        changelog.read_text(), next_version, release_date
+    prepared_notes = _prepend_release(
+        release_notes_file.read_text(),
+        next_version,
+        release_date,
+        generated_notes_file.read_text(),
     )
 
     uv = shutil.which("uv")
@@ -197,17 +245,22 @@ def _prepare_release(
         message = f"uv wrote version {actual_version}, expected {next_version}"
         raise _ReleaseError(message)
 
-    changelog.write_text(prepared_changelog)
+    release_notes_file.write_text(prepared_notes)
     return next_version
 
 
-def _verify_tag(project_file: Path, changelog: Path, prefix: str, tag: str) -> None:
+def _verify_tag(
+    project_file: Path,
+    release_notes_file: Path,
+    prefix: str,
+    tag: str,
+) -> None:
     version = _read_project_version(project_file)
     expected_tag = f"{prefix}{version}"
     if tag != expected_tag:
         message = f"Release tag {tag!r} does not match expected tag {expected_tag!r}"
         raise _ReleaseError(message)
-    _release_notes(changelog.read_text(), version)
+    _release_notes(release_notes_file.read_text(), version)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -221,10 +274,10 @@ def _parser() -> argparse.ArgumentParser:
         help="project metadata file (default: pyproject.toml)",
     )
     parser.add_argument(
-        "--changelog",
+        "--release-notes-file",
         type=Path,
-        default=_default_changelog(),
-        help="changelog file (default: CHANGELOG.md or release-notes.md)",
+        default=_DEFAULT_RELEASE_NOTES_FILE,
+        help="canonical release notes file",
     )
     parser.add_argument(
         "--tag-prefix",
@@ -234,20 +287,30 @@ def _parser() -> argparse.ArgumentParser:
 
     commands = parser.add_subparsers(dest="command", required=True)
     prepare = commands.add_parser(
-        "prepare", help="bump the version and move Unreleased changes into a release"
+        "prepare", help="bump the version and prepend generated release notes"
     )
     prepare.add_argument("bump", choices=("patch", "minor", "major"))
+    prepare.add_argument(
+        "--notes-file",
+        type=Path,
+        required=True,
+        help="generated Markdown notes to add to the release history",
+    )
     prepare.add_argument(
         "--date",
         default=date.today().isoformat(),
         help="release date in YYYY-MM-DD format (default: today)",
     )
+    next_version = commands.add_parser(
+        "next-version", help="print the version produced by a SemVer bump"
+    )
+    next_version.add_argument("bump", choices=("patch", "minor", "major"))
     commands.add_parser("current-version", help="print the project version")
     commands.add_parser("release-tag", help="print the expected release tag")
     notes = commands.add_parser("release-notes", help="print one release's notes")
     notes.add_argument("--version", help="version to read (default: current version)")
     verify = commands.add_parser(
-        "verify-tag", help="verify a tag against project metadata and the changelog"
+        "verify-tag", help="verify a tag against project metadata and release notes"
     )
     verify.add_argument("tag")
     return parser
@@ -265,7 +328,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     """
     namespace = _parser().parse_args(arguments)
     project_file = cast(Path, namespace.project_file)
-    changelog = cast(Path, namespace.changelog)
+    release_notes_file = cast(Path, namespace.release_notes_file)
     tag_prefix = cast(str, namespace.tag_prefix)
     command = cast(str, namespace.command)
 
@@ -276,9 +339,17 @@ def main(arguments: Sequence[str] | None = None) -> int:
             print(
                 _prepare_release(
                     project_file,
-                    changelog,
+                    release_notes_file,
+                    cast(Path, namespace.notes_file),
                     bump,
                     release_date,
+                )
+            )
+        elif command == "next-version":
+            print(
+                _bump_version(
+                    _read_project_version(project_file),
+                    cast(Bump, namespace.bump),
                 )
             )
         elif command == "current-version":
@@ -288,11 +359,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
         elif command == "release-notes":
             requested_version = cast(str | None, namespace.version)
             version = requested_version or _read_project_version(project_file)
-            print(_release_notes(changelog.read_text(), version), end="")
+            print(_release_notes(release_notes_file.read_text(), version), end="")
         elif command == "verify-tag":
             _verify_tag(
                 project_file,
-                changelog,
+                release_notes_file,
                 tag_prefix,
                 cast(str, namespace.tag),
             )
