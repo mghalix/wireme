@@ -13,10 +13,14 @@ test-unit:
 test-integration:
     uv run pytest tests/integration -m integration
 
+test-automation:
+    uv run pytest tests/automation
+
 test:
     uv run pytest \
         tests/unit \
         tests/integration \
+        tests/automation \
         --cov=wireme \
         --cov-report=term-missing
 
@@ -27,8 +31,12 @@ check:
     uv run pytest \
         tests/unit \
         tests/integration \
+        tests/automation \
         --cov=wireme \
         --cov-report=term-missing
+
+examples:
+    ./scripts/examples
 
 build:
     rm -rf dist
@@ -46,19 +54,10 @@ smoke: build
 
 # Serve the docs site locally with live reload (opens the browser).
 docs:
-    cd website && uvx zensical serve -o
+    cd website && uvx --with-requirements requirements.txt zensical serve -o
 
 # Build the docs site into website/site.
 docs-build:
-    cd website && uvx zensical build --strict
+    cd website && uvx --with-requirements requirements.txt zensical build --strict
 
-release-check: check smoke
-
-release version:
-    uv version {{ version }}
-    just check
-    just smoke
-    git add pyproject.toml uv.lock
-    git diff --cached --quiet || git commit -m "release: v{{ version }}"
-    git tag -a "v{{ version }}" -m "v{{ version }}"
-    git push origin HEAD --follow-tags
+release-check: check examples docs-build smoke

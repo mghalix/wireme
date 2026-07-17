@@ -1,57 +1,103 @@
-name: Publish release
+name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types:
+      - published
 
-permissions:
-  contents: read
+permissions: {}
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Publish to PyPI
+  build:
+    name: Build and verify
     runs-on: ubuntu-latest
-
-    environment:
-      name: pypi
-
+    timeout-minutes: 20
     permissions:
       contents: read
-      id-token: write
+
+    env:
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      RELEASE_AUTHOR: ${{ github.event.release.author.login }}
+      RELEASE_BODY: ${{ github.event.release.body }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
+        with:
+          version: "0.11.18"
+          enable-cache: false
 
       - name: Install Python
         run: uv python install 3.13
 
-      - name: Verify tag version
+      - name: Verify prepared release
         shell: bash
         run: |
           set -euo pipefail
 
-          project_version="$(
-            uv run --isolated python - <<'PY'
-          import tomllib
-
-          with open("pyproject.toml", "rb") as file:
-              project = tomllib.load(file)
-
-          print(project["project"]["version"])
-          PY
-          )"
-
-          expected_tag="v${project_version}"
-
-          if [[ "${GITHUB_REF_NAME}" != "${expected_tag}" ]]; then
-            echo "Tag ${GITHUB_REF_NAME} does not match version ${project_version}"
+          if [[ "${RELEASE_AUTHOR}" != "github-actions[bot]" ]]; then
+            echo "Release was not created by the draft-release workflow"
             exit 1
           fi
+
+          uv run python scripts/release.py verify-tag "${RELEASE_TAG}"
+
+          tagged_commit="$(git rev-parse HEAD)"
+          expected_marker="<!-- release-target:${tagged_commit} -->"
+          if [[ "${RELEASE_BODY}" != *"${expected_marker}"* ]]; then
+            echo "Release notes do not identify the checked-out release target"
+            exit 1
+          fi
+
+      - name: Verify tagged commit belongs to default branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags \
+            origin \
+            "${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}"
+
+          if ! git merge-base \
+            --is-ancestor HEAD "origin/${DEFAULT_BRANCH}"; then
+            echo "Tag ${RELEASE_TAG} does not belong to ${DEFAULT_BRANCH} history"
+            exit 1
+          fi
+
+      - name: Install all dependencies
+        run: uv sync --locked --all-extras --all-groups
+
+      - name: Verify code
+        run: |
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run basedpyright
+          uv run pytest \
+            tests/unit \
+            tests/integration \
+            tests/automation \
+            --cov=wireme \
+            --cov-report=term-missing
+
+      - name: Run examples
+        run: ./scripts/examples
+
+      - name: Build strict documentation
+        run: >
+          cd website &&
+          uvx --with-requirements requirements.txt zensical build --strict
 
       - name: Build
         run: uv build --no-sources
@@ -59,11 +105,70 @@ jobs:
       - name: Check distributions
         run: uvx twine check dist/*
 
-      - name: Smoke test wheel
+      - name: Verify DI-only wheel
         run: ./scripts/smoke "$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
 
-      - name: Smoke test source distribution
+      - name: Verify DI-only source distribution
         run: ./scripts/smoke "$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)"
 
+      - name: Upload verified distributions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to PyPI and GitHub
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/wireme
+
+    permissions:
+      artifact-metadata: write # Record artifact attestations for the repository.
+      attestations: write # Create provenance for the distributions.
+      contents: write # Upload assets to the published GitHub Release.
+      id-token: write # Authenticate to PyPI and sign provenance with OIDC.
+
+    steps:
+      - name: Download verified distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-distributions
+          path: dist/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
+        with:
+          version: "0.11.18"
+          enable-cache: false
+
+      - name: Attest distributions
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+
       - name: Publish
-        run: uv publish --trusted-publishing always
+        run: >
+          uv publish --trusted-publishing always
+          --check-url https://pypi.org/simple/
+          dist/*.whl
+          dist/*.tar.gz
+
+      - name: Upload GitHub release assets
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: >
+          gh release upload "${RELEASE_TAG}"
+          dist/*.whl
+          dist/*.tar.gz
+          --clobber

@@ -59,7 +59,8 @@ extend-immutable-calls = ["wireme.Wired", "wireme.wired"]
 "tests/*" = ["S101"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unit", "tests/integration"]
+testpaths = ["tests/unit", "tests/integration", "tests/automation"]
+pythonpath = ["."]
 addopts = ["--strict-config", "--strict-markers"]
 markers = ["integration: tests involving optional third-party frameworks"]
 
@@ -73,7 +74,15 @@ show_missing = true
 skip_covered = true
 
 [tool.basedpyright]
-include = ["src", "tests/unit", "tests/integration", "tests/typing", "examples"]
+include = [
+  "src",
+  "tests/unit",
+  "tests/integration",
+  "tests/automation",
+  "tests/typing",
+  "examples",
+  "scripts/release.py",
+]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 reportAny = false

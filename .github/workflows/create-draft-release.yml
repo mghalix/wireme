@@ -1,0 +1,94 @@
+name: Create draft release
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions: {}
+
+concurrency:
+  group: create-draft-release
+  cancel-in-progress: false
+
+jobs:
+  create-draft:
+    name: Create draft from merged release pull request
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'release/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # Create the draft GitHub release and its tag.
+
+    env:
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      RELEASE_TARGET: ${{ github.event.pull_request.merge_commit_sha }}
+
+    steps:
+      - name: Checkout merged release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d31148d669074a8d0a63714ba94f3201e7020bc3 # v8.3.0
+        with:
+          version: "0.11.18"
+          enable-cache: false
+
+      - name: Install Python
+        run: uv python install 3.13
+
+      - name: Verify release metadata and target
+        id: release-details
+        run: |
+          set -euo pipefail
+
+          tag="$(uv run python scripts/release.py release-tag)"
+          uv run python scripts/release.py verify-tag "${tag}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+          git fetch --no-tags \
+            origin \
+            "${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}"
+
+          if ! git merge-base \
+            --is-ancestor "${RELEASE_TARGET}" "origin/${DEFAULT_BRANCH}"; then
+            echo "Release target does not belong to ${DEFAULT_BRANCH} history"
+            exit 1
+          fi
+
+          if git show-ref --verify --quiet "refs/tags/${tag}"; then
+            echo "Release tag ${tag} already exists; tags are created from draft releases"
+            exit 1
+          fi
+
+          {
+            echo "<!-- release-target:${RELEASE_TARGET} -->"
+            echo
+            uv run python scripts/release.py release-notes
+          } > draft-release-notes.md
+
+      - name: Create draft release
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release-details.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} already exists"
+            exit 1
+          fi
+
+          gh release create "${RELEASE_TAG}" \
+            --draft \
+            --target "${RELEASE_TARGET}" \
+            --title "${RELEASE_TAG}" \
+            --notes-file draft-release-notes.md
