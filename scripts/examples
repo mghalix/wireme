@@ -9,5 +9,5 @@ cd "${repository}"
 
 for example in examples/*.py; do
     echo "== ${example}"
-    uv run python "${example}"
+    uv run --no-sync python "${example}"
 done
