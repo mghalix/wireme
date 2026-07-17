@@ -1,7 +1,7 @@
 [project]
 name = "wireme"
 version = "0.1.1"
-description = "Tiny, typed dependency injection built on FastDepends."
+description = "Tiny, typed dependency injection that leaves values unchanged."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
@@ -19,7 +19,7 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Typing :: Typed",
 ]
-dependencies = ["fast-depends[pydantic]>=3.0.8,<4"]
+dependencies = ["fast-depends>=3.0.8,<3.1"]
 
 [project.urls]
 Homepage = "https://github.com/mghalix/wireme"
@@ -53,7 +53,7 @@ select = ["B", "E4", "E7", "E9", "F", "I", "N", "RUF", "S", "SIM", "UP"]
 ignore = ["N802", "S101"]
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["pydantic.Field", "wireme.Wired", "wireme.wired"]
+extend-immutable-calls = ["wireme.Wired", "wireme.wired"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]

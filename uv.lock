@@ -180,11 +180,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1d/1d/e4843e4eeb65f51447b8c22d200d12d8f94f27c97e77bb7162515cc8d61f/fast_depends-3.0.8-py3-none-any.whl", hash = "sha256:4c52c8a3907bca46d43e70e4364d6d016872d9a3aae4bc0c1c85e72e0a6a21c7", size = 25507, upload-time = "2026-03-02T19:54:27.594Z" },
 ]
 
-[package.optional-dependencies]
-pydantic = [
-    { name = "pydantic" },
-]
-
 [[package]]
 name = "fastapi"
 version = "0.139.0"
@@ -549,7 +544,7 @@ name = "wireme"
 version = "0.1.1"
 source = { editable = "." }
 dependencies = [
-    { name = "fast-depends", extra = ["pydantic"] },
+    { name = "fast-depends" },
 ]
 
 [package.optional-dependencies]
@@ -569,7 +564,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fast-depends", extras = ["pydantic"], specifier = ">=3.0.8,<4" },
+    { name = "fast-depends", specifier = ">=3.0.8,<3.1" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.128,<1" },
 ]
 provides-extras = ["fastapi"]

@@ -17,11 +17,11 @@ from collections.abc import (
 from ._core import (
     _build_call_model,
     _CallModel,
+    _CustomField,
     _Dependant,
     _Depends,
+    _DiProvider,
     _inject,
-    _Provider,
-    _serializer,
 )
 
 
@@ -42,7 +42,7 @@ __all__ = (
 )
 
 _MISSING = object()
-_provider = _Provider()
+_provider = _DiProvider()
 
 
 type _DependencyFactory[R] = (
@@ -94,7 +94,51 @@ def _is_dependency_parameter(
     localns: dict[str, object],
 ) -> bool:
     """Return whether a parameter is supplied through dependency injection."""
+    return bool(
+        _dependency_markers(
+            parameter,
+            globalns=globalns,
+            localns=localns,
+        )
+    )
+
+
+def _dependency_markers(
+    parameter: inspect.Parameter,
+    /,
+    *,
+    globalns: dict[str, object],
+    localns: dict[str, object],
+) -> tuple[_Dependant, ...]:
+    """Return all FastDepends dependency markers attached to a parameter."""
+    markers: list[_Dependant] = []
     if isinstance(parameter.default, _Dependant):
+        markers.append(parameter.default)
+
+    annotation = _resolve_annotation(
+        parameter.annotation,
+        globalns=globalns,
+        localns=localns,
+    )
+    if typing.get_origin(annotation) is typing.Annotated:
+        markers.extend(
+            metadata
+            for metadata in typing.get_args(annotation)[1:]
+            if isinstance(metadata, _Dependant)
+        )
+
+    return tuple(markers)
+
+
+def _is_custom_field_parameter(
+    parameter: inspect.Parameter,
+    /,
+    *,
+    globalns: dict[str, object],
+    localns: dict[str, object],
+) -> bool:
+    """Return whether a parameter opts into FastDepends CustomField behavior."""
+    if isinstance(parameter.default, _CustomField):
         return True
 
     annotation = _resolve_annotation(
@@ -106,7 +150,8 @@ def _is_dependency_parameter(
         return False
 
     return any(
-        isinstance(metadata, _Dependant) for metadata in typing.get_args(annotation)[1:]
+        isinstance(metadata, _CustomField)
+        for metadata in typing.get_args(annotation)[1:]
     )
 
 
@@ -129,8 +174,13 @@ def _analyze_signature(
     /,
     *,
     localns: dict[str, object],
+    audited: set[int] | None = None,
 ) -> tuple[inspect.Signature, inspect.Signature, frozenset[str]]:
     """Return the original signature, resolved signature, and dependency names."""
+    if audited is None:
+        audited = set()
+    audited.add(id(func))
+
     original_signature = inspect.signature(func)
 
     globalns = dict(getattr(func, "__globals__", {}))
@@ -158,6 +208,35 @@ def _analyze_signature(
             localns=localns,
         ),
     )
+
+    if any(
+        _is_custom_field_parameter(
+            parameter,
+            globalns=globalns,
+            localns=localns,
+        )
+        for parameter in resolved_parameters
+    ):
+        message = (
+            "Wireme does not support FastDepends CustomField markers. "
+            "Use wired(factory) to supply application-specific values "
+            "through dependency injection."
+        )
+        raise TypeError(message)
+
+    for parameter in resolved_parameters:
+        for marker in _dependency_markers(
+            parameter,
+            globalns=globalns,
+            localns=localns,
+        ):
+            factory = marker.dependency
+            if id(factory) not in audited:
+                _analyze_signature(
+                    factory,
+                    localns=localns,
+                    audited=audited,
+                )
 
     dependency_names = frozenset(
         parameter.name
@@ -215,8 +294,6 @@ def _wire[**P, T](
     func: Callable[P, T],
     /,
     *,
-    cast: bool,
-    cast_result: bool,
     requires: tuple[Callable[..., object], ...] = (),
     localns: dict[str, object],
 ) -> Callable[P, T]:
@@ -237,10 +314,13 @@ def _wire[**P, T](
     with _signature_override(func, resolved_signature):
         wrapped = _inject(
             func,
-            cast=cast,
-            cast_result=cast_result,
+            cast=False,
+            cast_result=False,
             dependency_provider=_provider,
-            extra_dependencies=tuple(_Depends(factory) for factory in requires),
+            extra_dependencies=tuple(
+                _Depends(factory, cast=False, cast_result=False) for factory in requires
+            ),
+            serializer_cls=None,
         )
 
     public_parameters = tuple(
@@ -261,8 +341,6 @@ def _factory_model(
     /,
     *,
     use_cache: bool,
-    cast: bool,
-    cast_result: bool,
 ) -> tuple[_CallModel, inspect.Signature]:
     """Build a FastDepends call model and the factory's public signature.
 
@@ -282,8 +360,8 @@ def _factory_model(
             dependency_provider=_provider,
             use_cache=use_cache,
             is_sync=False,
-            serializer_cls=_serializer if cast else None,
-            serialize_result=cast_result,
+            serializer_cls=None,
+            serialize_result=False,
         )
 
     public_signature = resolved_signature.replace(
@@ -302,8 +380,6 @@ def _wire_class[T](
     cls: type[T],
     /,
     *,
-    cast: bool,
-    cast_result: bool,
     requires: tuple[Callable[..., object], ...],
     localns: dict[str, object],
 ) -> type[T]:
@@ -322,8 +398,6 @@ def _wire_class[T](
 
     wired_init = _wire(
         cls.__init__,
-        cast=cast,
-        cast_result=cast_result,
         requires=requires,
         localns=localns,
     )
@@ -336,8 +410,6 @@ def _wire_target(
     target: Callable[..., object],
     /,
     *,
-    cast: bool,
-    cast_result: bool,
     requires: tuple[Callable[..., object], ...],
     localns: dict[str, object],
 ) -> typing.Any:
@@ -345,16 +417,12 @@ def _wire_target(
     if inspect.isclass(target):
         return _wire_class(
             target,
-            cast=cast,
-            cast_result=cast_result,
             requires=requires,
             localns=localns,
         )
 
     return _wire(
         target,
-        cast=cast,
-        cast_result=cast_result,
         requires=requires,
         localns=localns,
     )
@@ -381,8 +449,6 @@ def wire[**P, T](func: Callable[P, T], /) -> Callable[P, T]: ...
 @typing.overload
 def wire(
     *,
-    cast: bool = True,
-    cast_result: bool = True,
     requires: Sequence[Callable[..., object]] = (),
 ) -> _WireDecorator: ...
 
@@ -391,8 +457,6 @@ def wire(
     func: Callable[..., object] | None = None,
     /,
     *,
-    cast: bool = True,
-    cast_result: bool = True,
     requires: Sequence[Callable[..., object]] = (),
 ) -> typing.Any:
     """Enable dependency injection and hide injected runtime parameters.
@@ -409,8 +473,6 @@ def wire(
 
     Args:
         func: The class or callable to wire when used as a bare decorator.
-        cast: Validate and coerce arguments with pydantic.
-        cast_result: Validate and coerce the return value with pydantic.
         requires: Side-effect dependency factories resolved on every call
             without being passed as parameters, such as guard checks.
             Generator factories clean up when the call finishes.
@@ -421,6 +483,7 @@ def wire(
 
     Raises:
         TypeError: If applied to a class that does not define __init__.
+        TypeError: If the target uses a FastDepends CustomField marker.
     """
     localns = _caller_locals()
 
@@ -429,8 +492,6 @@ def wire(
         def decorator(inner: Callable[..., object], /) -> typing.Any:
             return _wire_target(
                 inner,
-                cast=cast,
-                cast_result=cast_result,
                 requires=tuple(requires),
                 localns=localns,
             )
@@ -439,8 +500,6 @@ def wire(
 
     return _wire_target(
         func,
-        cast=cast,
-        cast_result=cast_result,
         requires=tuple(requires),
         localns=localns,
     )
@@ -452,8 +511,6 @@ def wired[**P, R](
     /,
     *,
     use_cache: bool = True,
-    cast: bool = True,
-    cast_result: bool = False,
 ) -> R: ...
 
 
@@ -463,8 +520,6 @@ def wired[**P, R](
     /,
     *,
     use_cache: bool = True,
-    cast: bool = True,
-    cast_result: bool = False,
 ) -> R: ...
 
 
@@ -474,8 +529,6 @@ def wired[**P, R](
     /,
     *,
     use_cache: bool = True,
-    cast: bool = True,
-    cast_result: bool = False,
 ) -> R: ...
 
 
@@ -485,8 +538,6 @@ def wired[**P, R](
     /,
     *,
     use_cache: bool = True,
-    cast: bool = True,
-    cast_result: bool = False,
 ) -> R: ...
 
 
@@ -495,22 +546,23 @@ def wired(
     /,
     *,
     use_cache: bool = True,
-    cast: bool = True,
-    cast_result: bool = False,
 ) -> typing.Any:
     """Declare a dependency resolved by a callable.
 
     The factory's signature is resolved when the dependency is declared, so
     PEP 695 aliases and postponed annotations in the factory's own
     parameters work at any nesting depth.
+
+    Raises:
+        TypeError: If the factory uses a FastDepends CustomField marker.
     """
     _resolve_factory_signature(factory, localns=_caller_locals())
 
     return _Depends(
         factory,
         use_cache=use_cache,
-        cast=cast,
-        cast_result=cast_result,
+        cast=False,
+        cast_result=False,
     )
 
 
@@ -525,7 +577,14 @@ def override_dependency[R](
     Nested overrides are restored correctly. Overrides modify a shared provider,
     so use them for isolated tests and application setup, not concurrent
     request-level mutation.
+
+    Raises:
+        TypeError: If either factory uses a FastDepends CustomField marker.
     """
+    localns = _caller_locals()
+    _resolve_factory_signature(original, localns=localns)
+    _resolve_factory_signature(replacement, localns=localns)
+
     previous_override = _provider.overrides.get(original, _MISSING)
     _provider.override(original, replacement)
 

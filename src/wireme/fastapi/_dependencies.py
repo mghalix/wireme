@@ -6,7 +6,6 @@ import functools
 import typing
 from collections.abc import AsyncIterator, Callable
 from contextlib import AsyncExitStack
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated, Any
 
 from wireme._core import _CallModel, _Dependant
@@ -17,18 +16,9 @@ from ._compat import Depends
 type _Factory = Callable[..., Any]
 
 
-@dataclass(frozen=True, slots=True)
-class _BridgeConfig:
-    """Identify one Wireme-to-FastAPI bridge configuration."""
-
-    use_cache: bool
-    cast: bool
-    cast_result: bool
-
-
 _bridges: dict[
     _Factory,
-    dict[_BridgeConfig, _Factory],
+    dict[bool, _Factory],
 ] = {}
 
 
@@ -96,31 +86,29 @@ def _build_adapter(model: _CallModel, /) -> _Factory:
 @functools.cache
 def _cached_bridge(
     factory: _Factory,
-    config: _BridgeConfig,
+    use_cache: bool,
     /,
 ) -> _Factory:
     """Create one stable FastAPI adapter per factory and configuration."""
     model, public_signature = _factory_model(
         factory,
-        use_cache=config.use_cache,
-        cast=config.cast,
-        cast_result=config.cast_result,
+        use_cache=use_cache,
     )
 
     adapter = _build_adapter(model)
     typing.cast("_HasSignature", adapter).__signature__ = public_signature
 
-    _bridges.setdefault(factory, {})[config] = adapter
+    _bridges.setdefault(factory, {})[use_cache] = adapter
 
     return adapter
 
 
 def _bridge_factory(
     factory: _Factory,
-    config: _BridgeConfig,
+    use_cache: bool,
     /,
 ) -> _Factory:
-    """Return the stable adapter for a factory, validating its identity."""
+    """Return the stable adapter for a factory after checking its identity."""
     try:
         hash(factory)
     except TypeError as error:
@@ -131,20 +119,12 @@ def _bridge_factory(
         )
         raise TypeError(message) from error
 
-    return _cached_bridge(factory, config)
+    return _cached_bridge(factory, use_cache)
 
 
 def _bridge_marker(marker: _Dependant, /) -> _Factory:
     """Create or retrieve the adapter for a Wireme marker."""
-    factory = marker.dependency
-
-    config = _BridgeConfig(
-        use_cache=marker.use_cache,
-        cast=marker.cast,
-        cast_result=marker.cast_result,
-    )
-
-    return _bridge_factory(factory, config)
+    return _bridge_factory(marker.dependency, marker.use_cache)
 
 
 def get_override_pairs(
@@ -157,10 +137,10 @@ def get_override_pairs(
         (original, replacement),
     ]
 
-    for config, original_adapter in _bridges.get(original, {}).items():
+    for use_cache, original_adapter in _bridges.get(original, {}).items():
         replacement_adapter = _bridge_factory(
             replacement,
-            config,
+            use_cache,
         )
         pairs.append((original_adapter, replacement_adapter))
 

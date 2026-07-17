@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import typing
 from typing import Annotated
 
 import pytest
@@ -21,6 +22,13 @@ from ._support import (
 )
 
 pytestmark = pytest.mark.integration
+
+
+def get_uncoerced_number() -> int:
+    return typing.cast("int", "1")
+
+
+type UncoercedNumberDep = Annotated[int, wired(get_uncoerced_number)]
 
 
 def test_from_web_constructs_plain_class() -> None:
@@ -131,6 +139,20 @@ def test_from_web_bridges_async_factory() -> None:
     assert response.json() == {
         "database": "production",
     }
+
+
+def test_from_web_bridge_preserves_factory_results() -> None:
+    app = FastAPI()
+
+    def endpoint(number: FromWeb[UncoercedNumberDep]) -> dict[str, object]:
+        return {"number": number, "type": type(number).__name__}
+
+    app.add_api_route("/", endpoint, methods=["GET"])
+
+    response = TestClient(app).get("/")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"number": "1", "type": "str"}
 
 
 def test_annotated_alias_without_wired_metadata_is_rejected() -> None:

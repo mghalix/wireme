@@ -48,17 +48,11 @@ def guard() -> None:
     return None
 
 
-@wire(cast=False, cast_result=False)
-def uncast(value: str = wired(sync_dependency)) -> str:
-    return value
-
-
 @wire(requires=(guard,))
 def guarded(value: str = wired(sync_dependency)) -> str:
     return value
 
 
-assert_type(uncast(), str)
 assert_type(guarded(), str)
 
 
