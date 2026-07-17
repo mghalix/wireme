@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import typing
 from collections.abc import AsyncIterator, Iterator
 from typing import Annotated
 
@@ -63,6 +64,16 @@ type SessionDep = Annotated[
 ]
 
 
+def get_uncoerced_number() -> int:
+    return typing.cast("int", "1")
+
+
+type UncoercedNumberDep = Annotated[
+    int,
+    wired(get_uncoerced_number),
+]
+
+
 app = FastAPI()
 
 
@@ -83,6 +94,11 @@ def async_resource_endpoint(session: FromWeb[SessionDep]) -> dict[str, str]:
     return {"database": session.name}
 
 
+@app.get("/uncoerced")
+def uncoerced_endpoint(number: FromWeb[UncoercedNumberDep]) -> dict[str, object]:
+    return {"number": number, "type": type(number).__name__}
+
+
 client = TestClient(app)
 
 response = client.get("/")
@@ -101,4 +117,8 @@ assert response.status_code == 200
 assert response.json() == {"database": "async-resource"}
 assert events == ["open-async", "use-async", "close-async"], events
 
-print("wireme FastAPI smoke test passed")
+response = client.get("/uncoerced")
+assert response.status_code == 200
+assert response.json() == {"number": "1", "type": "str"}
+
+print("wireme FastAPI lifecycle and unchanged-value smoke test passed")
