@@ -50,7 +50,10 @@ explicitly selected isolated environment.
 - uv run basedpyright  ->  type check (strict mode)
 - uv run ruff check .  ->  lint
 - uv run ruff format .  ->  format
-- just check  ->  format check, lint, types, tests with coverage
+- just dead-code  ->  find dead Python code at 100 percent confidence
+- just dead-code 80  ->  broaden the exploratory dead-code scan
+- just audit-actions  ->  audit GitHub Actions offline as an auditor
+- just check  ->  format check, lint, types, static audits, tests with coverage
 - just examples  ->  run every documented example
 - just build  ->  uv build --no-sources into a clean dist/
 - just docs  ->  serve the docs site locally with live reload

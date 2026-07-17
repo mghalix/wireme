@@ -71,6 +71,7 @@ def async_resource_route(service: FromWeb[AsyncResourceServiceDep]) -> None:
 
 
 def replacement_with_different_parameters(flag: bool = True) -> Service:
+    _ = flag
     return Service()
 
 

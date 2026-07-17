@@ -24,10 +24,24 @@ test:
         --cov=wireme \
         --cov-report=term-missing
 
+# Find unused Python code. Lower confidence to broaden the exploratory scan.
+dead-code confidence="100":
+    uv run vulture --min-confidence "{{ confidence }}"
+
+# Audit GitHub Actions locally without requiring a GitHub token.
+audit-actions persona="auditor" severity="low":
+    uv run zizmor \
+        --offline \
+        --persona "{{ persona }}" \
+        --min-severity "{{ severity }}" \
+        .
+
 check:
     uv run ruff format --check .
     uv run ruff check .
     uv run basedpyright
+    just dead-code
+    just audit-actions
     uv run pytest \
         tests/unit \
         tests/integration \

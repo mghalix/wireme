@@ -158,6 +158,19 @@ jobs:
       - name: Test release automation
         run: uv run --python 3.13 pytest tests/automation
 
+      - name: Find dead Python code
+        run: uv run --python 3.13 vulture
+
+      - name: Audit GitHub Actions
+        run: >
+          uv run
+          --python 3.13
+          zizmor
+          --offline
+          --persona auditor
+          --min-severity low
+          .
+
   docs:
     name: Documentation
     runs-on: ubuntu-latest
