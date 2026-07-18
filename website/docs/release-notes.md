@@ -5,6 +5,14 @@ breaking changes bump minor, features and fixes bump patch. Published
 artifacts are immutable; a broken release is fixed by publishing a new
 version.
 
+## 0.2.1 - 2026-07-18
+
+- Refresh the README, documentation landing page, and package metadata to present Wireme as a focused dependency injection library.
+- Refine README badges and surface the documentation link more clearly.
+- Standardize release preparation and publishing, and enforce Conventional Commits throughout pull requests.
+- Update GitHub Actions and build tooling dependencies.
+- This release does not change Wireme's runtime dependency injection behavior.
+
 ## 0.2.0 - 2026-07-17
 
 - Remove `cast` and `cast_result` from `wire` and `wired`; Wireme now preserves
