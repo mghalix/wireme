@@ -181,7 +181,9 @@ just release-check
 Before publication, the workflows require all of the following:
 
 - the release pull request came from this repository's `release/` branch
-- the release target is the merged pull-request commit on the default branch
+- an automatic release target is the merged release pull-request commit
+- a manual recovery target is the exact default-branch commit running the
+  workflow
 - no release tag or draft already existed
 - the tag equals `v` plus `[project].version`
 - the canonical release notes have a non-empty section for that version
@@ -214,8 +216,10 @@ and runs the core and FastAPI suites without allowing uv to restore the lock.
 - Bad release pull request -> close it without merging, fix labels or merged
   changes, and run Prepare release again.
 - Bad generated notes -> edit and curate them in the open release pull request.
-- Failed candidate build -> fix through a normal pull request, then prepare a
-  new release.
+- Failed candidate build before a tag or draft exists -> fix through a normal
+  pull request. After it merges, open GitHub Actions -> Create draft release,
+  select the default branch, and run the workflow manually. The recovery path
+  releases that exact default-branch commit and refuses any other branch.
 - Bad draft -> do not publish it. Delete the draft and associated tag, fix the
   problem through a pull request, and prepare again.
 - Published release -> never replace its artifacts or tag. Fix the problem in
