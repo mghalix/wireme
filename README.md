@@ -7,24 +7,30 @@
   </picture>
 </p>
 
-Tiny, typed dependency injection for Python. Resolve the graph. Touch nothing
-else.
+<p align="center"><em>Tiny, typed dependency injection for Python.</em></p>
 
-Powered by FastDepends, Wireme keeps dependency injection explicit and small:
+<p align="center">
+  <a href="https://github.com/mghalix/wireme/actions/workflows/ci.yml"><img src="https://github.com/mghalix/wireme/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://pypi.org/project/wireme/"><img src="https://img.shields.io/pypi/v/wireme.svg" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/wireme/"><img src="https://img.shields.io/pypi/pyversions/wireme.svg" alt="Supported Python versions"></a>
+  <a href="https://wireme.mghalix.com"><img src="https://img.shields.io/badge/docs-wireme.mghalix.com-5b5bd6" alt="Documentation"></a>
+  <a href="https://github.com/mghalix/wireme/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mghalix/wireme.svg" alt="License"></a>
+</p>
 
-```python
-from wireme import Wired, override_dependency, wire, wired
-```
+---
 
-- `@wire` enables dependency resolution for a class constructor, function,
-  or method.
-- `wired(factory)` declares how a dependency is created.
-- `Wired()` marks a reusable `Annotated` dependency as caller-optional.
-- `override_dependency()` temporarily replaces a dependency in tests.
+**Documentation**: [https://wireme.mghalix.com](https://wireme.mghalix.com)
 
-Wireme only resolves dependencies. It never validates or coerces arguments,
-dependency results, or return values; application boundaries own those
-concerns.
+**Source code**: [https://github.com/mghalix/wireme](https://github.com/mghalix/wireme)
+
+---
+
+Declare how a dependency is created once, then inject it into functions,
+methods, constructors, or FastAPI endpoints without turning the dependency
+container into an application framework.
+
+Wireme resolves the graph and touches nothing else. It never validates,
+coerces, or serializes arguments, dependency results, or return values.
 
 ## Installation
 
@@ -42,8 +48,7 @@ Wireme requires Python 3.12 or newer.
 
 ## Sixty-second tour
 
-Declare a dependency once, inject it anywhere. Injected parameters go after
-`*` and disappear from the public signature:
+Declare a factory, wire an entry point, and keep the dependency fully typed:
 
 ```python
 from typing import Annotated
@@ -68,10 +73,14 @@ def create_user(username: str, *, database: DatabaseDep = Wired()) -> None:
     database.write(username)
 
 
-create_user("mo")  # database is resolved automatically
+create_user("mo")
 ```
 
-Classes wire their constructors; tests swap factories:
+Injected parameters are keyword-only and disappear from the public runtime
+signature. Callers see application inputs; Wireme resolves the rest.
+
+Classes wire their constructors, and tests replace factories without
+monkeypatching consumers:
 
 ```python
 from wireme import override_dependency
@@ -91,11 +100,11 @@ def get_test_database() -> Database:
 
 
 with override_dependency(get_database, get_test_database):
-    UserService()  # built against the test database
+    service = UserService()
 ```
 
-With FastAPI, the same wired class plugs into endpoints while FastAPI keeps
-ownership of the request lifecycle:
+The optional FastAPI integration lets FastAPI retain ownership of the request
+lifecycle while Wireme resolves the internal graph:
 
 ```python
 from fastapi import FastAPI
@@ -111,63 +120,41 @@ def list_users(*, service: FromWeb[UserService]) -> list[str]:
     return service.list_users()
 ```
 
-## Documentation
+## Why Wireme
 
-Rendered documentation lives at [wireme.mghalix.com](https://wireme.mghalix.com),
-including recipes and the house style guide. The same pages are browsable
-in the repository; the guide covers one concept per page, in reading order:
+- **Four core names.** `wire`, `wired`, `Wired`, and `override_dependency`.
+- **Typed end to end.** Reusable `Annotated` aliases keep declarations and
+  static types together.
+- **Hidden wiring.** Injected parameters stay out of public signatures,
+  editor call hints, and OpenAPI schemas.
+- **Complete lifecycles.** Sync, async, generator, and async-generator
+  factories compose with deterministic cleanup.
+- **Predictable values.** Dependency injection never becomes implicit
+  validation or coercion.
+- **Clean tests.** Overrides are nested-safe and restored after exceptions.
 
-| Page | What it covers |
-| --- | --- |
-| [Getting started](https://github.com/mghalix/wireme/blob/main/website/docs/guide/getting-started.md) | Install, wire a function, reusable dependencies |
-| [Wiring classes](https://github.com/mghalix/wireme/blob/main/website/docs/guide/classes.md) | Constructor and method injection |
-| [The dependency graph](https://github.com/mghalix/wireme/blob/main/website/docs/guide/dependency-graph.md) | Nesting, per-call caching, singletons |
-| [Resources](https://github.com/mghalix/wireme/blob/main/website/docs/guide/resources.md) | Async factories and generator cleanup |
-| [Testing](https://github.com/mghalix/wireme/blob/main/website/docs/guide/testing.md) | Overrides and explicit values |
-| [Side-effect dependencies](https://github.com/mghalix/wireme/blob/main/website/docs/guide/side-effects.md) | Guards and auditing with `requires` |
-| [Protocol dependencies](https://github.com/mghalix/wireme/blob/main/website/docs/guide/protocols.md) | Depending on interfaces |
-| [FastAPI integration](https://github.com/mghalix/wireme/blob/main/website/docs/guide/fastapi.md) | `FromWeb`, request-scoped resources, web overrides |
-| [Building integrations](https://github.com/mghalix/wireme/blob/main/website/docs/guide/extending.md) | Wireme as your project's DI primitive |
+## Learn more
 
-Every capability also has a small runnable example; see the
+The [documentation](https://wireme.mghalix.com) contains the full
+[guide](https://wireme.mghalix.com/guide/), production
+[recipes](https://wireme.mghalix.com/recipes/fastapi-app/), and
+[Wireme way](https://wireme.mghalix.com/the-wireme-way/). Every public
+capability also has a runnable entry in the
 [example index](https://github.com/mghalix/wireme/blob/main/examples/README.md).
 
-## Public API
+## Implementation
 
-| Name                  | Purpose                                                         |
-| --------------------- | --------------------------------------------------------------- |
-| `wire`                | Decorate a class, function, or method and enable dependency resolution. Accepts side-effect dependencies through `requires`. |
-| `wired`               | Declare a dependency factory and its per-call cache behavior.   |
-| `Wired`               | Mark an `Annotated` dependency as caller-optional.              |
-| `override_dependency` | Temporarily replace a factory, with nested restoration.         |
-
-The optional `wireme.fastapi` integration adds:
-
-| Name                      | Purpose                                                        |
-| ------------------------- | -------------------------------------------------------------- |
-| `FromWeb`                 | Annotate endpoint parameters with classes or wired aliases.    |
-| `override_web_dependency` | Temporarily replace a web dependency, with nested restoration. |
-
-## Why Wireme instead of importing FastDepends directly?
-
-FastDepends provides the resolution engine. Wireme provides a deliberately
-small, opinionated facade with:
-
-- A cohesive `wire`, `wired`, and `Wired` vocabulary.
-- Strong return typing for sync, async, generator, and async-generator factories.
-- Reusable `Annotated` dependencies.
-- Injected parameters hidden from public runtime signatures.
-- Nested-safe dependency overrides.
-- A DI-only contract: values pass through unchanged.
-- A minimal backend-independent public namespace.
+Wireme currently uses FastDepends internally for graph execution, caching,
+async dispatch, and resource lifecycles. That engine is an implementation
+detail: application code uses Wireme's API and does not need to learn or import
+FastDepends.
 
 ## Versioning
 
 Wireme follows [SemVer](https://semver.org) with the strict 0.x mapping:
-below 1.0.0, a breaking change bumps minor and features or fixes bump patch,
-so the minor number is the breaking-change signal. Published artifacts are
-immutable; a broken release is fixed by publishing a new version. See the
-[release notes](https://wireme.mghalix.com/release-notes/).
+below 1.0.0, a breaking change bumps minor and features or fixes bump patch.
+Published artifacts are immutable; a broken release is fixed by publishing a
+new version. See the [release notes](https://wireme.mghalix.com/release-notes/).
 
 ## License
 

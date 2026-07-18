@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Mohanad Ghali", email = "mghalix@gmail.com" }]
-keywords = ["dependency-injection", "di", "fast-depends", "typing"]
+keywords = ["dependency-injection", "dependency-graph", "di", "typing"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
