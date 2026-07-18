@@ -15,9 +15,8 @@ hide:
 <p align="center"><strong>Tiny, typed dependency injection for Python.</strong></p>
 
 <p align="center">
-Resolve the graph. Touch nothing else. Powered by FastDepends, explicit,
-opinionated, and small enough to learn in an afternoon: four names cover the
-whole core.
+Resolve the graph. Touch nothing else. Explicit, opinionated, and small enough
+to learn in an afternoon: four names cover the whole core.
 </p>
 
 ---

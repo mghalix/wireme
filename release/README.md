@@ -24,6 +24,22 @@ Run Prepare release and choose patch, minor, or major
 There is one active release lane. Preparation stops when another release pull
 request or draft release exists.
 
+## Maintainer mental model
+
+The workflow has four deliberate authorization points:
+
+| Action | Meaning | Public effect |
+| --- | --- | --- |
+| Run `Prepare release` | Ask automation to propose a version and generated notes in a normal pull request. | None. No tag, release, or package exists. |
+| Merge the release pull request | Approve the version and curated notes. Automation verifies that exact merge commit, builds it, creates the tag, and attaches attested assets to a draft release. | The versioned notes can reach the website, but the release and package are still private. |
+| Publish the draft GitHub Release | Confirm that the tag, notes, wheel, and sdist are the intended public release. GitHub makes them immutable. | The GitHub Release becomes public and triggers the publishing workflow. |
+| Approve the `pypi` environment | Authorize Trusted Publishing after the immutable release and provenance checks pass. | The exact reviewed assets become installable from PyPI. |
+
+Preparation is therefore a proposal, not a release. Merging selects the exact
+source commit and creates a reviewable candidate. Publishing the complete draft
+is the public-release switch; the protected environment is the final package
+registry switch.
+
 ## One-time repository setup
 
 ### Release automation GitHub App
