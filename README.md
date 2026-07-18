@@ -11,17 +11,15 @@
 
 <p align="center">
   <a href="https://github.com/mghalix/wireme/actions/workflows/ci.yml"><img src="https://github.com/mghalix/wireme/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/mghalix/wireme/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-100%25-brightgreen" alt="Coverage: 100%"></a>
   <a href="https://pypi.org/project/wireme/"><img src="https://img.shields.io/pypi/v/wireme.svg" alt="PyPI version"></a>
   <a href="https://pypi.org/project/wireme/"><img src="https://img.shields.io/pypi/pyversions/wireme.svg" alt="Supported Python versions"></a>
-  <a href="https://wireme.mghalix.com"><img src="https://img.shields.io/badge/docs-wireme.mghalix.com-5b5bd6" alt="Documentation"></a>
   <a href="https://github.com/mghalix/wireme/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mghalix/wireme.svg" alt="License"></a>
 </p>
 
 ---
 
-**Documentation**: [https://wireme.mghalix.com](https://wireme.mghalix.com)
-
-**Source code**: [https://github.com/mghalix/wireme](https://github.com/mghalix/wireme)
+**Documentation**: [wireme.mghalix.com](https://wireme.mghalix.com)
 
 ---
 
