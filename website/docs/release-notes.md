@@ -7,17 +7,11 @@ version.
 
 ## 0.2.1 - 2026-07-18
 
-### What's Changed
-#### Documentation
-* docs: sharpen Wireme project identity by @mghalix in https://github.com/mghalix/wireme/pull/10
-#### Other changes
-* ci: enforce conventional commits by @mghalix in https://github.com/mghalix/wireme/pull/5
-* refactor(release): standardize versioned release workflow by @mghalix in https://github.com/mghalix/wireme/pull/6
-* chore(actions): bump astral-sh/setup-uv from 8.3.0 to 8.3.2 in the github-actions group by @dependabot[bot] in https://github.com/mghalix/wireme/pull/7
-* chore(deps): update uv-build requirement from <0.11.0,>=0.10.0 to >=0.10.0,<0.12.0 in the python-packages group by @dependabot[bot] in https://github.com/mghalix/wireme/pull/8
-
-### New Contributors
-* @dependabot[bot] made their first contribution in https://github.com/mghalix/wireme/pull/7
+- Refresh the README, documentation landing page, and package metadata to present Wireme as a focused dependency injection library.
+- Refine README badges and surface the documentation link more clearly.
+- Standardize release preparation and publishing, and enforce Conventional Commits throughout pull requests.
+- Update GitHub Actions and build tooling dependencies.
+- This release does not change Wireme's runtime dependency injection behavior.
 
 ## 0.2.0 - 2026-07-17
 
