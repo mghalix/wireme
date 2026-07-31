@@ -4,6 +4,7 @@ on:
   pull_request:
     types:
       - closed
+  workflow_dispatch:
 
 permissions: {}
 
@@ -15,9 +16,14 @@ jobs:
   create-draft:
     name: Build assets and create draft
     if: >-
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      startsWith(github.event.pull_request.head.ref, 'release/')
+      (
+        github.event_name == 'workflow_dispatch' &&
+        github.ref_name == github.event.repository.default_branch
+      ) || (
+        github.event.pull_request.merged == true &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        startsWith(github.event.pull_request.head.ref, 'release/')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -27,13 +33,13 @@ jobs:
 
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-      RELEASE_TARGET: ${{ github.event.pull_request.merge_commit_sha }}
+      RELEASE_TARGET: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.pull_request.merge_commit_sha }}
 
     steps:
       - name: Checkout merged release commit
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ env.RELEASE_TARGET }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -50,6 +56,16 @@ jobs:
         id: release-details
         run: |
           set -euo pipefail
+
+          if [[ ! "${RELEASE_TARGET}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Release target must be a full commit SHA"
+            exit 1
+          fi
+
+          if [[ "$(git rev-parse HEAD)" != "${RELEASE_TARGET}" ]]; then
+            echo "Checked-out commit does not match the release target"
+            exit 1
+          fi
 
           tag="$(uv run python release/prepare.py release-tag)"
           uv run python release/prepare.py verify-tag "${tag}"
@@ -80,7 +96,7 @@ jobs:
         run: uv sync --locked --all-extras --all-groups
 
       - name: Build and verify release candidate
-        run: just release-check
+        run: uv run --no-sync just release-check
 
       - name: Attest distributions
         uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
