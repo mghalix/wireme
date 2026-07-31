@@ -7,9 +7,37 @@ version.
 
 ## 0.2.2 - 2026-07-31
 
-### What's Changed
-#### Features
-* feat(core): support context manager dependency factories by @mghalix in https://github.com/mghalix/wireme/pull/13
+### Added
+
+- Support context manager dependency factories. A factory decorated with
+  `@contextmanager` or `@asynccontextmanager` can be passed to `wired()`
+  directly, so an existing resource no longer has to be rewritten as a bare
+  generator function to be injectable.
+- Resolve context manager factories through `FromWeb`, with the same FastAPI
+  request lifecycle as generator factories: entered when the request needs
+  them, closed after the response, nested resources closed in reverse order.
+- Accept context manager factories on both sides of `override_dependency()`
+  and `override_web_dependency()`, in any combination with sync, async,
+  generator, and async-generator factories.
+- Add `AbstractContextManager` and `AbstractAsto
+  `wired()`, so a decorated factory infers the yielded type rather than the
+  context manager type.
+- Add `examples/context_managers.py` and
+  `examples/fastapi_context_managers.py`, and
+  factories in the resources and FastAPI guides.
+
+### Fixed
+
+- A context manager factory passed to `wired()` previously resolved to an
+  unentered context manager object instead of h
+  no setup or cleanup and no error.
+
+### Notes
+
+- No behavior change for any dependency form that already worked. Decorators
+  applied with `functools.wraps`, including `f
+  intact and keep running.
+- Recorded in ADR 0020.
 
 ## 0.2.1 - 2026-07-18
 
