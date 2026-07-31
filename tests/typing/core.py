@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Generator, Iterator
+from contextlib import asynccontextmanager, contextmanager
 from typing import Annotated, assert_type
 
 from wireme import Wired, override_dependency, wire, wired
@@ -77,4 +78,24 @@ def replacement_dependency() -> str:
 
 
 with override_dependency(original_dependency, replacement_dependency):
+    pass
+
+
+@contextmanager
+def context_manager_dependency() -> Generator[str]:
+    yield "context-manager"
+
+
+@asynccontextmanager
+async def async_context_manager_dependency() -> AsyncGenerator[str]:
+    yield "async-context-manager"
+
+
+assert_type(wired(context_manager_dependency), str)
+assert_type(wired(async_context_manager_dependency), str)
+
+with override_dependency(
+    context_manager_dependency,
+    async_context_manager_dependency,
+):
     pass

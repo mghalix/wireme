@@ -9,7 +9,7 @@ from contextlib import AsyncExitStack
 from typing import TYPE_CHECKING, Annotated, Any
 
 from wireme._core import _CallModel, _Dependant
-from wireme._impl import _factory_model, _HasSignature
+from wireme._impl import _factory_model, _HasSignature, _normalize_factory
 
 from ._compat import Depends
 
@@ -132,14 +132,23 @@ def get_override_pairs(
     replacement: _Factory,
     /,
 ) -> tuple[tuple[_Factory, _Factory], ...]:
-    """Return direct and bridged FastAPI override pairs."""
+    """Return direct and bridged FastAPI override pairs.
+
+    The direct pair keeps the callables as given, because a plain FastAPI
+    dependency is registered under the object passed to Depends(). Bridged
+    adapters are looked up under the normalized factory, matching the
+    identity wired(...) registered for a context manager factory.
+    """
     pairs: list[tuple[_Factory, _Factory]] = [
         (original, replacement),
     ]
 
-    for use_cache, original_adapter in _bridges.get(original, {}).items():
+    normalized_original = _normalize_factory(original)
+    normalized_replacement = _normalize_factory(replacement)
+
+    for use_cache, original_adapter in _bridges.get(normalized_original, {}).items():
         replacement_adapter = _bridge_factory(
-            replacement,
+            normalized_replacement,
             use_cache,
         )
         pairs.append((original_adapter, replacement_adapter))

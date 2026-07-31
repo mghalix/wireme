@@ -18,6 +18,7 @@ uv run python examples/basic.py
 | Class, instance, and method factories          | `factories.py`           |
 | Process-wide singletons                        | `singletons.py`          |
 | Generator and async resource cleanup           | `resources.py`           |
+| Context manager factories as dependencies      | `context_managers.py`    |
 | Side-effect dependencies (`requires`) with injected context | `requires.py` |
 | Wiring many methods with an apply combinator   | `method_wiring.py`       |
 | Test overrides                                 | `overrides.py`           |
@@ -28,6 +29,7 @@ uv run python examples/basic.py
 | FastAPI request-scoped resources               | `fastapi_resources.py`   |
 | FastAPI nested-safe web overrides              | `fastapi_overrides.py`   |
 | FastAPI endpoints wired directly               | `fastapi_endpoints.py`   |
+| FastAPI context manager dependencies           | `fastapi_context_managers.py` |
 
 All examples run in CI. When a public capability is added, add or extend an
 example and list it here.

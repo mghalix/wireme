@@ -178,6 +178,7 @@ foundation:
 - asynchronous factories
 - generator factories
 - asynchronous generator factories
+- context manager and asynchronous context manager factories
 - nested dependencies
 - callable objects
 - functools.partial

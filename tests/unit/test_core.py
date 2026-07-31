@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import contextlib
 import functools
 import inspect
 import typing
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Callable, Generator
 from typing import Annotated, Any
 
 import pytest
@@ -582,3 +583,142 @@ def testwire_restores_existing_custom_signature() -> None:
     assert getattr(operation, "__signature__") is custom_signature  # noqa: B009
     assert inspect.signature(wrapped) == custom_signature
     assert wrapped("value") == "value"
+
+
+def test_context_manager_dependency() -> None:
+    events: list[str] = []
+
+    @contextlib.contextmanager
+    def get_session() -> Generator[str]:
+        events.append("open")
+        try:
+            yield "session"
+        finally:
+            events.append("close")
+
+    @wire
+    def operation(value: str = wired(get_session)) -> str:
+        events.append("handle")
+        return value
+
+    assert operation() == "session"
+    assert events == ["open", "handle", "close"]
+
+
+@pytest.mark.anyio
+async def test_async_context_manager_dependency() -> None:
+    events: list[str] = []
+
+    @contextlib.asynccontextmanager
+    async def get_session() -> AsyncGenerator[str]:
+        events.append("open")
+        try:
+            yield "session"
+        finally:
+            events.append("close")
+
+    @wire
+    async def operation(value: str = wired(get_session)) -> str:
+        events.append("handle")
+        return value
+
+    assert await operation() == "session"
+    assert events == ["open", "handle", "close"]
+
+
+def test_context_manager_dependency_closes_after_exception() -> None:
+    events: list[str] = []
+
+    @contextlib.contextmanager
+    def get_session() -> Generator[str]:
+        try:
+            yield "session"
+        finally:
+            events.append("close")
+
+    @wire
+    def operation(value: str = wired(get_session)) -> str:
+        raise RuntimeError(value)
+
+    with pytest.raises(RuntimeError, match="session"):
+        operation()
+
+    assert events == ["close"]
+
+
+def test_context_manager_dependency_is_overridable() -> None:
+    @contextlib.contextmanager
+    def get_session() -> Generator[str]:
+        yield "production"
+
+    @contextlib.contextmanager
+    def get_test_session() -> Generator[str]:
+        yield "test"
+
+    @wire
+    def operation(value: str = wired(get_session)) -> str:
+        return value
+
+    with override_dependency(get_session, get_test_session):
+        assert operation() == "test"
+
+    assert operation() == "production"
+
+
+def test_context_manager_dependency_accepts_plain_replacement() -> None:
+    @contextlib.contextmanager
+    def get_session() -> Generator[str]:
+        yield "production"
+
+    def get_test_session() -> str:
+        return "test"
+
+    @wire
+    def operation(value: str = wired(get_session)) -> str:
+        return value
+
+    with override_dependency(get_session, get_test_session):
+        assert operation() == "test"
+
+    assert operation() == "production"
+
+
+def test_wrapped_factory_keeps_its_decorator() -> None:
+    events: list[str] = []
+
+    def audited(func: Callable[[], str]) -> Callable[[], str]:
+        @functools.wraps(func)
+        def wrapper() -> str:
+            events.append("audit")
+            return func()
+
+        return wrapper
+
+    @audited
+    def get_value() -> str:
+        return "value"
+
+    @wire
+    def operation(value: str = wired(get_value)) -> str:
+        return value
+
+    assert operation() == "value"
+    assert events == ["audit"]
+
+
+def test_cached_factory_keeps_its_cache() -> None:
+    calls = 0
+
+    @functools.lru_cache
+    def get_value() -> str:
+        nonlocal calls
+        calls += 1
+        return "value"
+
+    @wire
+    def operation(value: str = wired(get_value)) -> str:
+        return value
+
+    assert operation() == "value"
+    assert operation() == "value"
+    assert calls == 1
