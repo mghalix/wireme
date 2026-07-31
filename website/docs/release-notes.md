@@ -5,6 +5,12 @@ breaking changes bump minor, features and fixes bump patch. Published
 artifacts are immutable; a broken release is fixed by publishing a new
 version.
 
+## 0.2.2 - 2026-07-31
+
+### What's Changed
+#### Features
+* feat(core): support context manager dependency factories by @mghalix in https://github.com/mghalix/wireme/pull/13
+
 ## 0.2.1 - 2026-07-18
 
 - Refresh the README, documentation landing page, and package metadata to present Wireme as a focused dependency injection library.
