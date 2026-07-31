@@ -1,5 +1,12 @@
+import contextlib
 import functools
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Callable,
+    Generator,
+    Iterator,
+)
 from typing import Annotated, Any
 
 import pytest
@@ -344,3 +351,91 @@ def test_use_cache_false_resolves_separately() -> None:
     response = client.get("/")
 
     assert response.json() == {"first": 1, "second": 2}
+
+
+@contextlib.contextmanager
+def get_context_manager_connection() -> Generator[Connection]:
+    events.append("open")
+    try:
+        yield Connection("context-manager")
+    finally:
+        events.append("close")
+
+
+type ContextManagerConnectionDep = Annotated[
+    Connection,
+    wired(get_context_manager_connection),
+]
+
+
+@contextlib.asynccontextmanager
+async def get_async_context_manager_connection() -> AsyncGenerator[Connection]:
+    events.append("open")
+    try:
+        yield Connection("async-context-manager")
+    finally:
+        events.append("close")
+
+
+type AsyncContextManagerConnectionDep = Annotated[
+    Connection,
+    wired(get_async_context_manager_connection),
+]
+
+
+async def get_context_manager_session(
+    *,
+    connection: ContextManagerConnectionDep = Wired(),
+) -> AsyncIterator[Session]:
+    events.append("open session")
+    try:
+        yield Session(connection)
+    finally:
+        events.append("close session")
+
+
+type ContextManagerSessionDep = Annotated[
+    Session,
+    wired(get_context_manager_session),
+]
+
+
+def test_context_manager_factory_cleans_up_after_response() -> None:
+    def endpoint(connection: FromWeb[ContextManagerConnectionDep]) -> dict[str, str]:
+        events.append("use")
+        return {"name": connection.name}
+
+    client = _create_app(endpoint)
+
+    response = client.get("/")
+
+    assert response.json() == {"name": "context-manager"}
+    assert events == ["open", "use", "close"]
+
+
+def test_async_context_manager_factory_cleans_up_after_response() -> None:
+    def endpoint(
+        connection: FromWeb[AsyncContextManagerConnectionDep],
+    ) -> dict[str, str]:
+        events.append("use")
+        return {"name": connection.name}
+
+    client = _create_app(endpoint)
+
+    response = client.get("/")
+
+    assert response.json() == {"name": "async-context-manager"}
+    assert events == ["open", "use", "close"]
+
+
+def test_context_manager_nested_in_generator_closes_in_reverse_order() -> None:
+    def endpoint(session: FromWeb[ContextManagerSessionDep]) -> dict[str, str]:
+        events.append("use")
+        return {"name": session.connection.name}
+
+    client = _create_app(endpoint)
+
+    response = client.get("/")
+
+    assert response.json() == {"name": "context-manager"}
+    assert events == ["open", "open session", "use", "close session", "close"]

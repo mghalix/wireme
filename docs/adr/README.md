@@ -18,3 +18,5 @@ defaults, member selection, and the documentation site). Decision 0018 was
 recorded on 2026-07-17 to establish a strict DI-only boundary. Decision 0019
 was recorded on 2026-07-18 to establish one versioned history, a cohesive
 release tooling boundary, and immutable assets as the PyPI handoff.
+Decision 0020 was recorded on 2026-08-01 to accept context manager
+factories as dependencies through one normalization point.

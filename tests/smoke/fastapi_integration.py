@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import typing
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Generator, Iterator
+from contextlib import contextmanager
 from typing import Annotated
 
 from fastapi import FastAPI
@@ -64,6 +65,21 @@ type SessionDep = Annotated[
 ]
 
 
+@contextmanager
+def get_context_connection() -> Generator[Database]:
+    events.append("open-context")
+    try:
+        yield Database("context-resource")
+    finally:
+        events.append("close-context")
+
+
+type ContextConnectionDep = Annotated[
+    Database,
+    wired(get_context_connection),
+]
+
+
 def get_uncoerced_number() -> int:
     return typing.cast("int", "1")
 
@@ -94,6 +110,14 @@ def async_resource_endpoint(session: FromWeb[SessionDep]) -> dict[str, str]:
     return {"database": session.name}
 
 
+@app.get("/context-resource")
+def context_resource_endpoint(
+    connection: FromWeb[ContextConnectionDep],
+) -> dict[str, str]:
+    events.append("use-context")
+    return {"database": connection.name}
+
+
 @app.get("/uncoerced")
 def uncoerced_endpoint(number: FromWeb[UncoercedNumberDep]) -> dict[str, object]:
     return {"number": number, "type": type(number).__name__}
@@ -116,6 +140,13 @@ response = client.get("/async-resource")
 assert response.status_code == 200
 assert response.json() == {"database": "async-resource"}
 assert events == ["open-async", "use-async", "close-async"], events
+
+events.clear()
+
+response = client.get("/context-resource")
+assert response.status_code == 200
+assert response.json() == {"database": "context-resource"}
+assert events == ["open-context", "use-context", "close-context"], events
 
 response = client.get("/uncoerced")
 assert response.status_code == 200

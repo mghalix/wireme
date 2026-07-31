@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import contextlib
 import inspect
+import types
 import typing
 from collections.abc import (
+    AsyncGenerator,
     AsyncIterator,
     Awaitable,
     Callable,
@@ -13,6 +15,7 @@ from collections.abc import (
     Iterator,
     Sequence,
 )
+from contextlib import AbstractAsyncContextManager, AbstractContextManager
 
 from ._core import (
     _build_call_model,
@@ -31,10 +34,17 @@ class _HasSignature(typing.Protocol):
     __signature__: inspect.Signature
 
 
+class _HasWrapped(typing.Protocol):
+    """Represent a decorator helper exposing the callable it wraps."""
+
+    __wrapped__: Callable[..., object]
+
+
 __all__ = (
     "Wired",
     "_HasSignature",
     "_factory_model",
+    "_normalize_factory",
     "_wire",
     "override_dependency",
     "wire",
@@ -44,13 +54,48 @@ __all__ = (
 _MISSING = object()
 _provider = _DiProvider()
 
+# Both decorators return a helper closure, and every helper produced by one
+# decorator shares that decorator's code object. The lambdas below are only
+# wrapped, never called, so their bodies are irrelevant.
+_CONTEXT_MANAGER_CODES: typing.Final[frozenset[types.CodeType]] = frozenset(
+    {
+        contextlib.contextmanager(
+            typing.cast("Callable[[], Generator[None]]", lambda: None)
+        ).__code__,
+        contextlib.asynccontextmanager(
+            typing.cast("Callable[[], AsyncGenerator[None]]", lambda: None)
+        ).__code__,
+    }
+)
+
 
 type _DependencyFactory[R] = (
     Callable[..., Awaitable[R]]
     | Callable[..., AsyncIterator[R]]
     | Callable[..., Iterator[R]]
+    | Callable[..., AbstractContextManager[R]]
+    | Callable[..., AbstractAsyncContextManager[R]]
     | Callable[..., R]
 )
+
+
+def _normalize_factory[F](factory: F, /) -> F:
+    """Return the generator function behind a context manager decorator.
+
+    ``@contextmanager`` and ``@asynccontextmanager`` return a helper that
+    builds a context manager object rather than yielding the dependency, so
+    FastDepends would inject the unentered manager. Both decorators produce
+    helpers sharing one code object, which identifies them precisely without
+    unwrapping unrelated ``functools.wraps`` decorators such as caches or
+    instrumentation.
+
+    Normalization is applied wherever a factory enters Wireme so declaration
+    and override sites agree on one identity for the same dependency.
+    """
+    if getattr(factory, "__code__", None) in _CONTEXT_MANAGER_CODES:
+        return typing.cast("F", typing.cast("_HasWrapped", factory).__wrapped__)
+
+    return factory
 
 
 def Wired() -> typing.Any:
@@ -534,6 +579,24 @@ def wired[**P, R](
 
 @typing.overload
 def wired[**P, R](
+    factory: Callable[P, AbstractAsyncContextManager[R]],
+    /,
+    *,
+    use_cache: bool = True,
+) -> R: ...
+
+
+@typing.overload
+def wired[**P, R](
+    factory: Callable[P, AbstractContextManager[R]],
+    /,
+    *,
+    use_cache: bool = True,
+) -> R: ...
+
+
+@typing.overload
+def wired[**P, R](
     factory: Callable[P, R],
     /,
     *,
@@ -553,9 +616,14 @@ def wired(
     PEP 695 aliases and postponed annotations in the factory's own
     parameters work at any nesting depth.
 
+    Factories decorated with ``@contextmanager`` or ``@asynccontextmanager``
+    are resolved through the generator function they wrap, so they behave
+    exactly like the equivalent generator factory.
+
     Raises:
         TypeError: If the factory uses a FastDepends CustomField marker.
     """
+    factory = _normalize_factory(factory)
     _resolve_factory_signature(factory, localns=_caller_locals())
 
     return _Depends(
@@ -578,10 +646,15 @@ def override_dependency[R](
     so use them for isolated tests and application setup, not concurrent
     request-level mutation.
 
+    Either factory may be a context manager decorated with
+    ``@contextmanager`` or ``@asynccontextmanager``.
+
     Raises:
         TypeError: If either factory uses a FastDepends CustomField marker.
     """
     localns = _caller_locals()
+    original = _normalize_factory(original)
+    replacement = _normalize_factory(replacement)
     _resolve_factory_signature(original, localns=localns)
     _resolve_factory_signature(replacement, localns=localns)
 

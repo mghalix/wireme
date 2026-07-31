@@ -111,6 +111,10 @@ def report(*, connection: FromWeb[ConnectionDep]) -> dict[str, str]:
     return {"status": connection.status()}
 ```
 
+Factories decorated with `@contextmanager` or `@asynccontextmanager` are
+bridged the same way and follow the same request lifecycle. See
+[Resources](resources.md#context-managers).
+
 ## Web overrides
 
 `override_web_dependency()` temporarily replaces a dependency on one
@@ -130,8 +134,10 @@ with override_web_dependency(app, get_user_service, get_test_service):
     client.get("/users")
 ```
 
-Replacements may be sync, async, generator, or async-generator factories
-and may have different parameter lists.
+Replacements may be sync, async, generator, async-generator, or context
+manager factories and may have different parameter lists. The original and
+the replacement may each be decorated with `@contextmanager` or
+`@asynccontextmanager`.
 
 One limitation: bridged adapters are discovered when the override context
 is entered, so routes using `FromWeb` must be registered before entering
@@ -172,6 +178,7 @@ a FastAPI error about the unresolved wired annotation.
 [examples/fastapi_integration.py](https://github.com/mghalix/wireme/blob/main/examples/fastapi_integration.py),
 [examples/fastapi_resources.py](https://github.com/mghalix/wireme/blob/main/examples/fastapi_resources.py),
 [examples/fastapi_overrides.py](https://github.com/mghalix/wireme/blob/main/examples/fastapi_overrides.py),
-[examples/fastapi_endpoints.py](https://github.com/mghalix/wireme/blob/main/examples/fastapi_endpoints.py)
+[examples/fastapi_endpoints.py](https://github.com/mghalix/wireme/blob/main/examples/fastapi_endpoints.py),
+[examples/fastapi_context_managers.py](https://github.com/mghalix/wireme/blob/main/examples/fastapi_context_managers.py)
 
 Next: [Building integrations](extending.md)

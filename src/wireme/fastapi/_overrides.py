@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import typing
 from collections.abc import AsyncIterator, Awaitable, Callable, Generator, Iterator
+from contextlib import AbstractAsyncContextManager, AbstractContextManager
 
 from wireme.fastapi._dependencies import get_override_pairs
 
@@ -14,6 +15,8 @@ type _WebFactory[T] = (
     Callable[..., Awaitable[T]]
     | Callable[..., AsyncIterator[T]]
     | Callable[..., Iterator[T]]
+    | Callable[..., AbstractContextManager[T]]
+    | Callable[..., AbstractAsyncContextManager[T]]
     | Callable[..., T]
 )
 
@@ -35,8 +38,8 @@ def override_web_dependency[T](
     Both direct FastAPI dependencies and adapters created by
     FromWeb[WiredAlias] are overridden. Nested contexts restore the previous
     replacement correctly, including after exceptions. Replacements may be
-    sync, async, generator, or async-generator factories with different
-    parameter lists.
+    sync, async, generator, async-generator, or context manager factories
+    with different parameter lists.
 
     Bridged adapters are discovered when the context is entered, so routes
     using FromWeb must be registered before entering the override context.

@@ -1,4 +1,5 @@
-from collections.abc import AsyncIterator, Iterator
+import contextlib
+from collections.abc import AsyncIterator, Generator, Iterator
 from typing import Annotated
 
 import pytest
@@ -246,3 +247,46 @@ def test_bridges_created_inside_override_context_need_reentry() -> None:
         assert client.get("/").json() == {
             "value": "replacement",
         }
+
+
+@contextlib.contextmanager
+def get_context_value() -> Generator[str]:
+    yield "production"
+
+
+@contextlib.contextmanager
+def get_test_context_value() -> Generator[str]:
+    yield "test"
+
+
+type ContextValueDep = Annotated[
+    str,
+    wired(get_context_value),
+]
+
+
+def _create_context_manager_app() -> FastAPI:
+    app = FastAPI()
+
+    def endpoint(value: FromWeb[ContextValueDep]) -> dict[str, str]:
+        return {"value": value}
+
+    app.add_api_route("/", endpoint, methods=["GET"])
+
+    return app
+
+
+def test_override_web_dependency_for_context_manager_factory() -> None:
+    app = _create_context_manager_app()
+    client = TestClient(app)
+
+    assert client.get("/").json() == {"value": "production"}
+
+    with override_web_dependency(
+        app,
+        get_context_value,
+        get_test_context_value,
+    ):
+        assert client.get("/").json() == {"value": "test"}
+
+    assert client.get("/").json() == {"value": "production"}
